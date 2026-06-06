@@ -1,0 +1,88 @@
+{
+    "layout": {
+        "type": "layout",
+        "pages": [{
+            "label": "Weather",
+            "sections": [{
+                "label": "API & Location",
+                "keys": ["api-key", "location", "units", "refresh-interval"]
+            }, {
+                "label": "Appearance",
+                "keys": ["theme", "show-forecast", "forecast-hours", "opacity", "width"]
+            }]
+        }]
+    },
+    "api-key": {
+        "type": "entry",
+        "default": "",
+        "description": "OpenWeatherMap API Key",
+        "tooltip": "Get your free key at https://openweathermap.org/api (free tier: 60 calls/min)"
+    },
+    "location": {
+        "type": "entry",
+        "default": "auto",
+        "description": "City name or 'auto' for IP geolocation",
+        "tooltip": "Example: 'London' or 'Moscow,RU' or 'auto'"
+    },
+    "units": {
+        "type": "combobox",
+        "default": "metric",
+        "description": "Temperature units",
+        "options": {
+            "metric": "Celsius °C",
+            "imperial": "Fahrenheit °F"
+        }
+    },
+    "refresh-interval": {
+        "type": "spinbutton",
+        "default": 10,
+        "min": 2,
+        "max": 60,
+        "units": "minutes",
+        "step": 1,
+        "description": "Refresh interval"
+    },
+    "theme": {
+        "type": "combobox",
+        "default": "auto",
+        "description": "Colour theme",
+        "options": {
+            "auto": "Auto (adapts to weather/sky)",
+            "glass": "Glass (frosted, always light)",
+            "dark": "Dark (night mode)"
+        }
+    },
+    "show-forecast": {
+        "type": "switch",
+        "default": true,
+        "description": "Show hourly forecast strip"
+    },
+    "forecast-hours": {
+        "type": "spinbutton",
+        "default": 6,
+        "min": 3,
+        "max": 24,
+        "units": "hours",
+        "step": 3,
+        "description": "Forecast range",
+        "dependency": "show-forecast"
+    },
+    "opacity": {
+        "type": "spinbutton",
+        "default": 70,
+        "min": 20,
+        "max": 100,
+        "units": "%",
+        "step": 5,
+        "description": "Panel opacity"
+    },
+    "width": {
+        "type": "spinbutton",
+        "default": 350,
+        "min": 200,
+        "max": 600,
+        "units": "px",
+        "step": 10,
+        "description": "Desklet width"
+    }
+}
