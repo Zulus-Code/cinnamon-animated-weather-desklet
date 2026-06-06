@@ -1,0 +1,75 @@
+# Russian translations for Animated Weather Desklet
+# Copyright (C) 2026 Dmitry Kudriashov
+# This file is distributed under the same license as the package.
+# Dmitry Kudriashov <dmitrii.kudriashov@gmail.com>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: https://github.com/Zulus-Code/cinnamon-animated-weather-desklet/issues\n"
+"POT-Creation-Date: 2026-06-06 14:00+0300\n"
+"PO-Revision-Date: 2026-06-06 14:30+0300\n"
+"Last-Translator: Dmitry Kudriashov <dmitrii.kudriashov@gmail.com>\n"
+"Language-Team: Russian\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2);\n"
+"X-Generator: Poedit 3.x\n"
+
+#. metadata.json->name
+msgid "Animated Weather"
+msgstr "Анимированная погода"
+
+#. metadata.json->description
+msgid "Real-time animated weather desklet with live particle effects — rain, snow, clouds, stars, and dynamic sky gradients"
+msgstr "Десклет погоды с живыми анимациями — дождь, снег, облака, звёзды и динамическое небо"
+
+#. settings-schema.json->api-key->description
+msgid "OpenWeatherMap API Key"
+msgstr "API ключ OpenWeatherMap"
+
+#. settings-schema.json->api-key->tooltip
+msgid "Get your free key at https://openweathermap.org/api (free tier: 60 calls/min)"
+msgstr "Получите бесплатный ключ на https://openweathermap.org/api (бесплатно: 60 запросов/мин)"
+
+#. settings-schema.json->location->description
+msgid "City name or 'auto' for IP geolocation"
+msgstr "Название города или 'auto' для определения по IP"
+
+#. settings-schema.json->location->tooltip
+msgid "Example: 'London' or 'Moscow,RU' or 'auto'"
+msgstr "Пример: 'Москва' или 'Moscow,RU' или 'auto'"
+
+#. settings-schema.json->units->description
+msgid "Temperature units"
+msgstr "Единицы температуры"
+
+#. settings-schema.json->language->description
+msgid "Interface language"
+msgstr "Язык интерфейса"
+
+#. settings-schema.json->refresh-interval->description
+msgid "Refresh interval"
+msgstr "Интервал обновления"
+
+#. settings-schema.json->theme->description
+msgid "Colour theme"
+msgstr "Цветовая тема"
+
+#. settings-schema.json->show-forecast->description
+msgid "Show hourly forecast strip"
+msgstr "Показывать почасовой прогноз"
+
+#. settings-schema.json->forecast-hours->description
+msgid "Forecast range"
+msgstr "Диапазон прогноза"
+
+#. settings-schema.json->opacity->description
+msgid "Panel opacity"
+msgstr "Прозрачность панели"
+
+#. settings-schema.json->width->description
+msgid "Desklet width"
+msgstr "Ширина десклета"

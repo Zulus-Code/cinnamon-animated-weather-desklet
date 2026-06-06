@@ -13,6 +13,9 @@ const Gio = imports.gi.Gio;
 const Cairo = imports.cairo;
 const ByteArray = imports.byteArray;
 
+const UUID = "weather-animated@zulus";
+const DESKLET_ROOT = imports.ui.deskletManager.deskletMeta[UUID].path;
+
 const COLORS = {
     sky: {
         clear_day: ['#4facfe', '#00f2fe'],
