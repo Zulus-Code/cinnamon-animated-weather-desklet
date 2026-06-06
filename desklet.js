@@ -178,17 +178,16 @@ AnimatedWeatherDesklet.prototype = {
         });
         this._drawArea.connect('repaint', Lang.bind(this, this._draw));
         this.setContent(this._drawArea);
+    },
 
-        // Handle resize via desklet actor allocation
-        this._resizeId = this.actor.connect('notify::allocation', Lang.bind(this, function() {
-            let [w, h] = this.actor.get_size();
-            if (w !== this._width || h !== this._height) {
-                this._width = Math.max(200, w);
-                this._height = Math.max(200, h);
-                this._drawArea.set_size(this._width, this._height);
-                this._initParticles();
-            }
-        }));
+    on_desklet_view_geometry_changed: function() {
+        let [w, h] = this.actor.get_size();
+        if (w > 50 && h > 50) {
+            this._width = w;
+            this._height = h;
+            this._drawArea.set_size(this._width, this._height);
+            this._initParticles();
+        }
     },
 
     /* ─── Settings Changed ───────────────────────────────── */
@@ -396,7 +395,8 @@ AnimatedWeatherDesklet.prototype = {
     },
 
     _drawParticles: function(cr, w, h) {
-        for (let p of this._particles) {
+        for (let i = 0; i < this._particles.length; i++) {
+            let p = this._particles[i];
             cr.save();
             switch (p.type) {
                 case 'rain': {
@@ -682,7 +682,8 @@ AnimatedWeatherDesklet.prototype = {
 
         let lines = errMsg.split('\n');
         let ly = h / 2 - lines.length * 10;
-        for (let line of lines) {
+        for (let li = 0; li < lines.length; li++) {
+            let line = lines[li];
             if (this._textWidth(cr, line) > w - 60) {
                 // Truncate
                 while (this._textWidth(cr, line + '…') > w - 60 && line.length > 3)
@@ -926,10 +927,6 @@ AnimatedWeatherDesklet.prototype = {
         if (this._weatherTimerId) {
             Mainloop.source_remove(this._weatherTimerId);
             this._weatherTimerId = 0;
-        }
-        if (this._resizeId) {
-            this.actor.disconnect(this._resizeId);
-            this._resizeId = 0;
         }
     },
 };

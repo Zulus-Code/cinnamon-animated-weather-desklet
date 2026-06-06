@@ -1,17 +1,4 @@
 {
-    "layout": {
-        "type": "layout",
-        "pages": [{
-            "label": "Weather",
-            "sections": [{
-                "label": "API & Location",
-                "keys": ["api-key", "location", "units", "refresh-interval"]
-            }, {
-                "label": "Appearance",
-                "keys": ["theme", "show-forecast", "forecast-hours", "opacity", "width"]
-            }]
-        }]
-    },
     "api-key": {
         "type": "entry",
         "default": "",
