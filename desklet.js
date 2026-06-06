@@ -169,9 +169,6 @@ AnimatedWeatherDesklet.prototype = {
 
     _buildUI: function() {
         this.setHeader('');
-        this._container = new St.Bin({ reactive: true, track_hover: true });
-        this._mainActor = this._container;
-        this.setContent(this._container);
 
         // Drawing area for custom Cairo render
         this._drawArea = new St.DrawingArea({
@@ -180,13 +177,17 @@ AnimatedWeatherDesklet.prototype = {
             height: this._height || 400,
         });
         this._drawArea.connect('repaint', Lang.bind(this, this._draw));
-        this._container.set_child(this._drawArea);
+        this.setContent(this._drawArea);
 
-        // Resize handler
-        this._container.connect('allocate', Lang.bind(this, function(actor, box, flags) {
-            this._width = box.x2 - box.x1;
-            this._height = box.y2 - box.y1;
-            this._drawArea.set_size(this._width, this._height);
+        // Handle resize via desklet actor allocation
+        this._resizeId = this.actor.connect('notify::allocation', Lang.bind(this, function() {
+            let [w, h] = this.actor.get_size();
+            if (w !== this._width || h !== this._height) {
+                this._width = Math.max(200, w);
+                this._height = Math.max(200, h);
+                this._drawArea.set_size(this._width, this._height);
+                this._initParticles();
+            }
         }));
     },
 
@@ -926,9 +927,9 @@ AnimatedWeatherDesklet.prototype = {
             Mainloop.source_remove(this._weatherTimerId);
             this._weatherTimerId = 0;
         }
-        if (this._updateTimerId) {
-            Mainloop.source_remove(this._updateTimerId);
-            this._updateTimerId = 0;
+        if (this._resizeId) {
+            this.actor.disconnect(this._resizeId);
+            this._resizeId = 0;
         }
     },
 };
