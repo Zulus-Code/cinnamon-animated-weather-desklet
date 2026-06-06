@@ -57,7 +57,7 @@ Ctrl+Alt+Esc
 ### Method 2: One-liner
 
 ```bash
-curl -sL https://github.com/Zulus-Code/cinnamon-animated-weather-desklet/raw/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/Zulus-Code/cinnamon-animated-weather-desklet/main/install.sh | bash
 ```
 
 ### Activate
