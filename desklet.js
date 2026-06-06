@@ -221,6 +221,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
 
         this._initParticles();
         if (this._drawArea) this._drawArea.queue_repaint();
+        this._refreshWeather();
     }
 
     _initParticles() {
