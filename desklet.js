@@ -140,9 +140,20 @@ AnimatedWeatherDesklet.prototype = {
         this._error = null;
         this._loading = true;
 
-        // HTTP session
-        this._httpSession = new Soup.Session();
-        this._httpSession.timeout = 10;
+        // HTTP session — compatible with libsoup2 (queue_message) and libsoup3 (send_async)
+        this._httpSession = null;
+        this._httpSessionAsync = null;
+        try {
+            if (typeof Soup.SessionAsync === 'function') {
+                this._httpSession = new Soup.SessionAsync();
+            } else {
+                this._httpSession = new Soup.Session();
+            }
+            this._httpSession.timeout = 10;
+        } catch(e) {
+            // last resort: blocking curl via spawn
+            this._httpSession = null;
+        }
 
         // Settings
         this.settings = new Settings.DeskletSettings(this, this._uuid, desklet_id);
@@ -763,6 +774,69 @@ AnimatedWeatherDesklet.prototype = {
         return icon && icon.endsWith('n');
     },
 
+    /* ─── HTTP Helper (libsoup2 + libsoup3 compatible) ────── */
+
+    _httpGet: function(url, onSuccess, onError) {
+        let session = this._httpSession;
+        if (!session) {
+            // Fallback: blocking curl
+            try {
+                let curlCmd = 'curl -s ' + GLib.shell_quote(url);
+                let [ok, stdout, stderr, exitStatus] = GLib.spawn_command_line_sync(curlCmd);
+                if (ok && stdout && stdout.length > 0) {
+                    onSuccess(stdout);
+                } else {
+                    if (onError) onError('HTTP error (exit ' + exitStatus + ')');
+                }
+            } catch(e) {
+                if (onError) onError(e.toString());
+            }
+            return;
+        }
+
+        let msg;
+        try {
+            // libsoup2 style
+            msg = Soup.Message.new('GET', url);
+        } catch(e) {
+            // libsoup3 style
+            try {
+                msg = new Soup.Message({ method: 'GET', uri: GLib.Uri.parse(url, GLib.UriFlags.NONE) });
+            } catch(e2) {
+                if (onError) onError('Failed to create request');
+                return;
+            }
+        }
+
+        if (typeof session.queue_message === 'function') {
+            // libsoup2 async
+            session.queue_message(msg, Lang.bind(this, function(sess, resp) {
+                if (resp.status_code === 200) {
+                    onSuccess(resp.response_body.data);
+                } else {
+                    if (onError) onError('HTTP ' + resp.status_code);
+                }
+            }));
+        } else if (typeof session.send_async === 'function') {
+            // libsoup3 async
+            session.send_async(msg, null, Lang.bind(this, function(sess, result) {
+                try {
+                    let bytes = sess.send_finish(result);
+                    let data = '';
+                    if (bytes && bytes.get_data) {
+                        let arr = bytes.get_data();
+                        data = String.fromCharCode.apply(null, arr);
+                    }
+                    onSuccess(data);
+                } catch(e) {
+                    if (onError) onError(e.toString());
+                }
+            }));
+        } else {
+            if (onError) onError('No Soup async method available');
+        }
+    },
+
     /* ─── Weather API ────────────────────────────────────── */
 
     _refreshWeather: function() {
@@ -794,13 +868,12 @@ AnimatedWeatherDesklet.prototype = {
         } else {
             // Auto-detect via free IP geolocation API
             let geoUrl = 'http://ip-api.com/json/?fields=city,countryCode&lang=en';
-            let msg = Soup.Message.new('GET', geoUrl);
-            this._httpSession.queue_message(msg, Lang.bind(this, function(session, response) {
-                if (response.status_code === 200) {
+            this._httpGet(geoUrl,
+                Lang.bind(this, function(data) {
                     try {
-                        let data = JSON.parse(response.response_body.data);
-                        let city = data.city || '';
-                        let country = data.countryCode || '';
+                        let json = JSON.parse(data);
+                        let city = json.city || '';
+                        let country = json.countryCode || '';
                         if (city) {
                             let locStr = city + (country ? ',' + country : '');
                             let url = 'https://api.openweathermap.org/data/2.5/weather?q='
@@ -810,42 +883,43 @@ AnimatedWeatherDesklet.prototype = {
                             return;
                         }
                     } catch(e) {}
-                }
-                // Fallback: just fetch with default
-                let url = 'https://api.openweathermap.org/data/2.5/weather?q=Moscow&appid='
-                    + key + '&units=' + (this.units || 'metric');
-                this._fetchWeather(url, key);
-            }));
+                    // Fallback: Moscow
+                    let url = 'https://api.openweathermap.org/data/2.5/weather?q=Moscow&appid='
+                        + key + '&units=' + (this.units || 'metric');
+                    this._fetchWeather(url, key);
+                }),
+                Lang.bind(this, function(err) {
+                    // Fallback on error
+                    let url = 'https://api.openweathermap.org/data/2.5/weather?q=Moscow&appid='
+                        + key + '&units=' + (this.units || 'metric');
+                    this._fetchWeather(url, key);
+                })
+            );
         }
     },
 
     _fetchWeather: function(url, key) {
-        let msg = Soup.Message.new('GET', url);
-        this._httpSession.queue_message(msg, Lang.bind(this, function(session, response) {
-            if (response.status_code !== 200) {
-                this._error = 'Weather API error: HTTP ' + response.status_code;
+        this._httpGet(url,
+            Lang.bind(this, function(data) {
+                try {
+                    this._weather = JSON.parse(data);
+                    this._loading = false;
+                    this._error = null;
+                    this._initParticles();
+                    this._fetchForecast(key);
+                    this._drawArea.queue_repaint();
+                } catch(e) {
+                    this._error = 'Parse error: ' + e.toString().slice(0, 40);
+                    this._loading = false;
+                    this._drawArea.queue_repaint();
+                }
+            }),
+            Lang.bind(this, function(err) {
+                this._error = 'Weather API error: ' + err;
                 this._loading = false;
                 this._drawArea.queue_repaint();
-                return;
-            }
-            try {
-                this._weather = JSON.parse(response.response_body.data);
-                this._loading = false;
-                this._error = null;
-
-                // Init particles for new weather
-                this._initParticles();
-
-                // Fetch forecast
-                this._fetchForecast(key);
-
-                this._drawArea.queue_repaint();
-            } catch(e) {
-                this._error = 'Parse error: ' + e.toString().slice(0, 40);
-                this._loading = false;
-                this._drawArea.queue_repaint();
-            }
-        }));
+            })
+        );
     },
 
     _fetchForecast: function(key) {
@@ -856,17 +930,16 @@ AnimatedWeatherDesklet.prototype = {
             + lat + '&lon=' + lon + '&appid=' + key
             + '&units=' + (this.units || 'metric') + '&cnt=8';
 
-        let msg = Soup.Message.new('GET', url);
-        this._httpSession.queue_message(msg, Lang.bind(this, function(session, response) {
-            if (response.status_code === 200) {
+        this._httpGet(url,
+            Lang.bind(this, function(data) {
                 try {
-                    this._forecast = JSON.parse(response.response_body.data);
+                    this._forecast = JSON.parse(data);
                 } catch(e) {
                     this._forecast = null;
                 }
                 this._drawArea.queue_repaint();
-            }
-        }));
+            })
+        );
     },
 
     /* ─── Animation Loop ─────────────────────────────────── */
