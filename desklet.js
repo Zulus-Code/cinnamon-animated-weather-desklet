@@ -33,6 +33,49 @@ const COLORS = {
     }
 };
 
+const STRINGS = {
+    en: {
+        feels_like:        'Feels like',
+        humidity:          'Humidity',
+        wind:              'Wind',
+        pressure:          'Pressure',
+        forecast:          'Forecast',
+        loading:           'Loading weather...',
+        no_api_key:        "No API key configured.\nGet one free at openweathermap.org/api",
+        check_key_short:   'Check API key in desklet settings',
+        check_key_long:    'Check API key in desklet settings \u2192 right click, Configure',
+        unknown_api_err:   'Unknown API error',
+        parse_err:         'Parse error',
+        api_err:           'Weather API error',
+        http_err:          'HTTP error (exit',
+        failed_req:        'Failed to create request',
+        http_prefix:       'HTTP',
+        no_soup:           'No Soup async method available',
+        wind_unit:         'km/h',
+        pressure_unit:     'hPa',
+    },
+    ru: {
+        feels_like:        '\u041E\u0449\u0443\u0449\u0430\u0435\u0442\u0441\u044F \u043A\u0430\u043A',
+        humidity:          '\u0412\u043B\u0430\u0436\u043D\u043E\u0441\u0442\u044C',
+        wind:              '\u0412\u0435\u0442\u0435\u0440',
+        pressure:          '\u0414\u0430\u0432\u043B\u0435\u043D\u0438\u0435',
+        forecast:          '\u041F\u0440\u043E\u0433\u043D\u043E\u0437',
+        loading:           '\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043F\u043E\u0433\u043E\u0434\u044B...',
+        no_api_key:        'API \u043A\u043B\u044E\u0447 \u043D\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D.\n\u041F\u043E\u043B\u0443\u0447\u0438\u0442\u0435 \u0431\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u043E \u043D\u0430 openweathermap.org/api',
+        check_key_short:   '\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 API \u043A\u043B\u044E\u0447 \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445',
+        check_key_long:    '\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 API \u043A\u043B\u044E\u0447 \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445 \u2192 \u041F\u041A\u041C, Configure',
+        unknown_api_err:   '\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430 API',
+        parse_err:         '\u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u0430\u0440\u0441\u0438\u043D\u0433\u0430',
+        api_err:           '\u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u043E\u0433\u043E\u0434\u043D\u043E\u0433\u043E API',
+        http_err:          '\u041E\u0448\u0438\u0431\u043A\u0430 HTTP (\u043A\u043E\u0434',
+        failed_req:        '\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0437\u0434\u0430\u0442\u044C \u0437\u0430\u043F\u0440\u043E\u0441',
+        http_prefix:       'HTTP',
+        no_soup:           '\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0433\u043E \u043C\u0435\u0442\u043E\u0434\u0430 Soup async',
+        wind_unit:         '\u043C/\u0441',
+        pressure_unit:     '\u0433\u041F\u0430',
+    }
+};
+
 function Particle(x, y, type) {
     this.x = x;
     this.y = y;
@@ -127,6 +170,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this.settings.bindProperty(Settings.BindingDirection.IN, 'forecast-hours', 'forecastHours', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'opacity', 'opacity', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'width', 'width', this._onSettingsChanged.bind(this));
+        this.settings.bindProperty(Settings.BindingDirection.IN, 'language', 'language', this._onSettingsChanged.bind(this));
 
         this._buildUI();
         this._onSettingsChanged();
@@ -463,7 +507,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
 
         cr.setFontSize(13);
         cr.setSourceRGBA(faintColor[0], faintColor[1], faintColor[2], 0.7);
-        let feelsStr = 'Feels like ' + feels + unit;
+        let feelsStr = this._('feels_like') + ' ' + feels + unit;
         cr.moveTo(cx - this._textWidth(cr, feelsStr) / 2, topY + 140);
         cr.showText(feelsStr);
 
@@ -473,8 +517,8 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         let colW = detailW / 3;
 
         let icons = ['💧', '💨', '🌡️'];
-        let vals = [hum + '%', wind + ' km/h', wData.main.pressure + ' hPa'];
-        let lbls = ['Humidity', 'Wind', 'Pressure'];
+        let vals = [hum + '%', wind + ' ' + this._('wind_unit'), wData.main.pressure + ' ' + this._('pressure_unit')];
+        let lbls = [this._('humidity'), this._('wind'), this._('pressure')];
 
         cr.setFontSize(20);
         for (let i = 0; i < 3; i++) {
@@ -530,7 +574,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
         cr.setSourceRGBA(faintColor[0], faintColor[1], faintColor[2], 0.5);
         cr.moveTo(pad + 5, forecastY - 10);
-        cr.showText('Forecast');
+        cr.showText(this._('forecast'));
 
         let list = this._forecast.list.slice(0, maxSlots);
         for (let i = 0; i < list.length; i++) {
@@ -576,7 +620,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         cr.setFontSize(18);
         cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
         cr.setSourceRGBA(textColor[0], textColor[1], textColor[2], 0.7);
-        let msg = 'Loading weather...';
+        let msg = this._('loading');
         cr.moveTo(w / 2 - this._textWidth(cr, msg) / 2, h / 2);
         cr.showText(msg);
     }
@@ -606,9 +650,9 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
 
         cr.setFontSize(11);
         cr.setSourceRGBA(textColor[0], textColor[1], textColor[2], 0.5);
-        let tip = 'Check API key in desklet settings -> right click, Configure';
+        let tip = this._('check_key_long');
         if (this._textWidth(cr, tip) > w - 60) {
-            tip = 'Check API key in desklet settings';
+            tip = this._('check_key_short');
         }
         cr.moveTo(w / 2 - this._textWidth(cr, tip) / 2, ly + 15);
         cr.showText(tip);
@@ -642,6 +686,12 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         let g = parseInt(hex.slice(3, 5), 16) / 255;
         let b = parseInt(hex.slice(5, 7), 16) / 255;
         return [r, g, b];
+    }
+
+    _(key) {
+        let lang = this.language || 'en';
+        let dict = STRINGS[lang] || STRINGS.en;
+        return dict[key] !== undefined ? dict[key] : STRINGS.en[key] || key;
     }
 
     _iconToEmoji(icon, id) {
@@ -687,7 +737,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
                 if (ok && exitStatus === 0 && out.length > 0) {
                     onSuccess(out);
                 } else {
-                    if (onError) onError('HTTP error (exit ' + exitStatus + ')');
+                    if (onError) onError(this._('http_err') + ' ' + exitStatus + ')');
                 }
             } catch (e) {
                 if (onError) onError(e.toString());
@@ -702,7 +752,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
             try {
                 msg = new Soup.Message({ method: 'GET', uri: GLib.Uri.parse(url, GLib.UriFlags.NONE) });
             } catch (e2) {
-                if (onError) onError('Failed to create request');
+                if (onError) onError(this._('failed_req'));
                 return;
             }
         }
@@ -712,7 +762,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
                 if (resp.status_code === 200) {
                     onSuccess(this._bytesToString(resp.response_body.data));
                 } else {
-                    if (onError) onError('HTTP ' + resp.status_code);
+                    if (onError) onError(this._('http_prefix') + ' ' + resp.status_code);
                 }
             }));
             return;
@@ -755,13 +805,13 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
             return;
         }
 
-        if (onError) onError('No Soup async method available');
+        if (onError) onError(this._('no_soup'));
     }
 
     _refreshWeather() {
         let key = this.apiKey;
         if (!key || key === '') {
-            this._error = 'No API key configured.\nGet one free at openweathermap.org/api';
+            this._error = this._('no_api_key');
             this._loading = false;
             this._drawArea.queue_repaint();
             return;
@@ -820,8 +870,8 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
                 try {
                     this._weather = JSON.parse(data);
                     if (this._weather && this._weather.cod && parseInt(this._weather.cod, 10) !== 200) {
-                        let message = this._weather.message || 'Unknown API error';
-                        this._error = 'Weather API error: ' + message;
+                        let message = this._weather.message || this._('unknown_api_err');
+                        this._error = this._('api_err') + ': ' + message;
                         this._loading = false;
                         this._drawArea.queue_repaint();
                         return;
@@ -832,13 +882,13 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
                     this._fetchForecast(key);
                     this._drawArea.queue_repaint();
                 } catch (e) {
-                    this._error = 'Parse error: ' + e.toString().slice(0, 60);
+                    this._error = this._('parse_err') + ': ' + e.toString().slice(0, 60);
                     this._loading = false;
                     this._drawArea.queue_repaint();
                 }
             }),
             Lang.bind(this, function(err) {
-                this._error = 'Weather API error: ' + err;
+                this._error = this._('api_err') + ': ' + err;
                 this._loading = false;
                 this._drawArea.queue_repaint();
             })

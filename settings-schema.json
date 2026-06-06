@@ -20,6 +20,15 @@
             "imperial": "Fahrenheit °F"
         }
     },
+    "language": {
+        "type": "combobox",
+        "default": "en",
+        "description": "Interface language",
+        "options": {
+            "en": "English",
+            "ru": "Русский"
+        }
+    },
     "refresh-interval": {
         "type": "spinbutton",
         "default": 10,
