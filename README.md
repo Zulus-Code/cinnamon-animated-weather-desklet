@@ -1,6 +1,6 @@
 # ☀️ Animated Weather Desklet for Cinnamon
 
-A beautiful, real-time animated weather desklet for Linux Mint Cinnamon desktop. Features live particle effects (rain, snow, drifting clouds, twinkling stars), glassmorphism UI, and auto-detection of your location.
+A beautiful, real-time animated weather desklet for Linux Mint Cinnamon desktop. Features live particle effects (rain, snow, drifting clouds, twinkling stars), glassmorphism UI, auto-detection of your location, and **full Russian language support**.
 
 ```
  ┌──────────────────────────────────┐
@@ -31,6 +31,7 @@ A beautiful, real-time animated weather desklet for Linux Mint Cinnamon desktop.
 - **Real-time data** — powered by OpenWeatherMap (free API)
 - **Hourly forecast** — 6/12/24 hour forecast strip
 - **Configurable** — units, theme (Auto/Glass/Dark), opacity, width, refresh interval
+- **🌐 Russian language** — interface and settings available in Русский
 - **Lightweight** — ~30fps Cairo-rendered, no GPU needed
 
 ## 📦 Installation
@@ -40,33 +41,57 @@ A beautiful, real-time animated weather desklet for Linux Mint Cinnamon desktop.
 - **Linux Mint 20+** (or any Cinnamon desktop ≥ 4.6)
 - **OpenWeatherMap API key** — [get one free](https://openweathermap.org/api) (free tier: 60 calls/min)
 
-### Method 1: Manual
+### Install
 
 ```bash
-# Clone or download
-git clone https://github.com/Zulus-Code/cinnamon-animated-weather-desklet.git
-
-# Install
-mkdir -p ~/.local/share/cinnamon/desklets/weather-animated@zulus/
-cp -r cinnamon-animated-weather-desklet/* ~/.local/share/cinnamon/desklets/weather-animated@zulus/
+# Clone and install in one go
+git clone https://github.com/Zulus-Code/cinnamon-animated-weather-desklet.git \
+  ~/.local/share/cinnamon/desklets/weather-animated@zulus/
 
 # Restart Cinnamon
 Ctrl+Alt+Esc
 ```
 
-### Method 2: One-liner
-
-```bash
-curl -sL https://raw.githubusercontent.com/Zulus-Code/cinnamon-animated-weather-desklet/master/install.sh | bash
-```
+> ⚠️ **Note:** The one-liner `curl | bash` method is no longer recommended. Use `git clone` for reliable installation and easy updates (`git pull`).
 
 ### Activate
 
 1. Right-click on desktop → **Add Desklet**
-2. Find **Animated Weather** → click **Add**
+2. Find **Анимированная погода** (or **Animated Weather**) → click **Add**
 3. Right-click the desklet → **Configure**
 4. Enter your **OpenWeatherMap API Key**
 5. Choose your **city** (or leave `auto`)
+6. Select **Language** → **Русский** (optional)
+
+### Updating
+
+```bash
+cd ~/.local/share/cinnamon/desklets/weather-animated@zulus/
+git pull
+Ctrl+Alt+Esc
+```
+
+## 🌐 Internationalisation
+
+The desklet supports **English** and **Russian** interface languages.
+
+**For the Cairo-rendered UI** (temperatures, labels, errors):
+Switch language in desklet settings: **Configure → Language → Русский**
+
+**For the settings dialog** (descriptions, tooltips):
+Install gettext and compile the translations:
+```bash
+sudo apt install gettext
+msgfmt ~/.local/share/cinnamon/desklets/weather-animated@zulus/po/ru.po \
+  -o ~/.local/share/locale/ru/LC_MESSAGES/weather-animated@zulus.mo
+Ctrl+Alt+Esc
+```
+
+When switching to Russian:
+- Wind unit changes from `km/h` to `м/с`
+- Pressure unit changes from `hPa` to `гПа`
+- All labels, errors, and loading messages are translated
+- Settings dialog descriptions and tooltips are translated (with `msgfmt`)
 
 ## ⚙️ Configuration
 
@@ -75,11 +100,13 @@ curl -sL https://raw.githubusercontent.com/Zulus-Code/cinnamon-animated-weather-
 | API Key | — | Your OpenWeatherMap API key (required) |
 | Location | `auto` | City name or 'auto' for IP geolocation |
 | Units | Celsius | °C or °F |
+| Language | English | Interface language (English / Русский) |
 | Refresh | 10 min | How often to fetch weather data |
 | Theme | Auto | Auto (adapts), Glass (always light), Dark |
 | Forecast | ✅ On | Show hourly forecast strip |
+| Forecast hours | 6 h | Forecast range (3–24 h) |
 | Opacity | 70% | Panel transparency |
-| Width | 350px | Desklet width |
+| Width | 350 px | Desklet width |
 
 ## 🎨 Weather Animations
 
@@ -99,13 +126,26 @@ The desklet is a single self-contained file rendered entirely via Cairo. The str
 
 ```
 weather-animated@zulus/
-├── desklet.js          # Main logic: particles, sky, UI, weather API
+├── desklet.js           # Main logic: particles, sky, UI, weather API, i18n
 ├── settings-schema.json # Settings UI definition
 ├── metadata.json        # Desklet metadata
 ├── stylesheet.css       # Container styles
+├── install.sh           # Legacy installer
+├── po/
+│   ├── weather-animated@zulus.pot  # Gettext translation template
+│   └── ru.po                       # Russian translations
 ├── README.md            # This file
 └── LICENSE              # GPL-3.0
 ```
+
+### Architecture
+
+- **Class-based** ES6 JavaScript (Cinnamon/GJS compatible)
+- **Cairo rendering** — all UI drawn via Cairo on `St.DrawingArea`
+- **Particle system** — lightweight physics for rain/snow/clouds/stars
+- **HTTP** — libsoup2 (queue_message) / libsoup3 (send_and_read_async) / blocking curl fallback
+- **i18n** — custom `STRINGS` dict + `_(key)` helper for Cairo text; Gettext `.po` files for settings dialog
+- **No dependencies** — pure JavaScript, no Node.js, no WebKit
 
 ### Building from source
 

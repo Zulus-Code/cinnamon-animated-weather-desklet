@@ -9,6 +9,12 @@ DEST="${HOME}/.local/share/cinnamon/desklets/weather-animated@zulus"
 echo "☀️ Installing Animated Weather Desklet..."
 echo ""
 
+echo "⚠️  NOTE: git clone is now the recommended installation method:"
+echo ""
+echo "    git clone https://github.com/Zulus-Code/cinnamon-animated-weather-desklet.git"
+echo "      ~/.local/share/cinnamon/desklets/weather-animated@zulus/"
+echo ""
+
 # Create destination
 mkdir -p "$DEST"
 
