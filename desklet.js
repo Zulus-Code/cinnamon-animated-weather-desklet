@@ -818,20 +818,22 @@ AnimatedWeatherDesklet.prototype = {
                 }
             }));
         } else if (typeof session.send_async === 'function') {
-            // libsoup3 async
+            // libsoup3 async — needs 4 args: (msg, cancellable, callback, user_data)
             session.send_async(msg, null, Lang.bind(this, function(sess, result) {
                 try {
                     let bytes = sess.send_finish(result);
                     let data = '';
                     if (bytes && bytes.get_data) {
                         let arr = bytes.get_data();
-                        data = String.fromCharCode.apply(null, arr);
+                        for (let bi = 0; bi < arr.length; bi++) {
+                            data += String.fromCharCode(arr[bi]);
+                        }
                     }
                     onSuccess(data);
                 } catch(e) {
                     if (onError) onError(e.toString());
                 }
-            }));
+            }), null);
         } else {
             if (onError) onError('No Soup async method available');
         }
