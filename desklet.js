@@ -829,13 +829,13 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         if (!key || key === '') {
             this._error = { key: 'no_api_key' };
             this._loading = false;
-            this._drawArea.queue_repaint();
+            if (this._drawArea) this._drawArea.queue_repaint();
             return;
         }
 
         this._loading = true;
         this._error = null;
-        this._drawArea.queue_repaint();
+        if (this._drawArea) this._drawArea.queue_repaint();
         this._resolveLocation(key);
     }
 
