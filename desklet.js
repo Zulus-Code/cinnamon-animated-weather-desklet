@@ -356,7 +356,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         else if (weatherId >= 801 && weatherId < 804) colors = isNight ? COLORS.sky.cloudy_night : COLORS.sky.cloudy_day;
         else colors = isNight ? COLORS.sky.stormy : COLORS.sky.cloudy_day;
 
-        let pat = cr.createLinearGradient(0, 0, 0, h);
+        let pat = new Cairo.LinearGradient(0, 0, 0, h);
         let c1 = this._hexToRgba(colors[0]);
         let c2 = this._hexToRgba(colors[1]);
         pat.addColorStopRGBA(0, c1[0], c1[1], c1[2], 1);
@@ -368,7 +368,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         if (weatherId === 800) {
             let glowY = isNight ? 30 : h * 0.15;
             let r = isNight ? 15 : Math.min(w, h) * 0.5;
-            let glow = cr.createRadialGradient(w * 0.5, glowY, 0, w * 0.5, glowY, r);
+            let glow = new Cairo.RadialGradient(w * 0.5, glowY, 0, w * 0.5, glowY, r);
             if (isNight) {
                 glow.addColorStopRGBA(0, 0.3, 0.4, 0.8, 0.3);
                 glow.addColorStopRGBA(1, 0.3, 0.4, 0.8, 0);
