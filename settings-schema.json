@@ -22,7 +22,7 @@
     },
     "language": {
         "type": "combobox",
-        "default": "en",
+        "default": "ru",
         "description": "Interface language",
         "options": {
             "en": "English",

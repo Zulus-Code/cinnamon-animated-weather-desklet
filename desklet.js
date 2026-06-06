@@ -205,7 +205,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
     _onSettingsChanged() {
         if (this._width !== this.width) {
             this._width = Math.max(200, Math.min(600, this.width));
-            this._drawArea.set_size(this._width, this._height);
+            if (this._drawArea) this._drawArea.set_size(this._width, this._height);
         }
 
         if (this._weatherTimerId) {
@@ -220,6 +220,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         }));
 
         this._initParticles();
+        if (this._drawArea) this._drawArea.queue_repaint();
     }
 
     _initParticles() {
@@ -628,10 +629,21 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         cr.showText(msg);
     }
 
-    _drawError(cr, w, h, errMsg) {
+    _drawError(cr, w, h, errInfo) {
         let t = this.theme || 'auto';
         let isDark = (t === 'dark') || (t === 'auto' && this._isNight());
         let textColor = isDark ? [1, 150 / 255, 150 / 255] : [1, 0.8, 0.8];
+
+        let errMsg;
+        if (typeof errInfo === 'string') {
+            errMsg = errInfo;
+        } else if (errInfo && errInfo.key) {
+            errMsg = errInfo.detail !== undefined
+                ? this._(errInfo.key) + ': ' + errInfo.detail
+                : this._(errInfo.key);
+        } else {
+            errMsg = '';
+        }
 
         cr.setFontSize(14);
         cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
@@ -814,7 +826,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
     _refreshWeather() {
         let key = this.apiKey;
         if (!key || key === '') {
-            this._error = this._('no_api_key');
+            this._error = { key: 'no_api_key' };
             this._loading = false;
             this._drawArea.queue_repaint();
             return;
@@ -873,8 +885,8 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
                 try {
                     this._weather = JSON.parse(data);
                     if (this._weather && this._weather.cod && parseInt(this._weather.cod, 10) !== 200) {
-                        let message = this._weather.message || this._('unknown_api_err');
-                        this._error = this._('api_err') + ': ' + message;
+                        let message = this._weather.message || 'unknown error';
+                        this._error = { key: 'api_err', detail: message };
                         this._loading = false;
                         this._drawArea.queue_repaint();
                         return;
@@ -885,13 +897,13 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
                     this._fetchForecast(key);
                     this._drawArea.queue_repaint();
                 } catch (e) {
-                    this._error = this._('parse_err') + ': ' + e.toString().slice(0, 60);
+                    this._error = { key: 'parse_err', detail: e.toString().slice(0, 60) };
                     this._loading = false;
                     this._drawArea.queue_repaint();
                 }
             }),
             Lang.bind(this, function(err) {
-                this._error = this._('api_err') + ': ' + err;
+                this._error = { key: 'api_err', detail: err };
                 this._loading = false;
                 this._drawArea.queue_repaint();
             })
