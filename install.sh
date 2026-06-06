@@ -1,36 +1,41 @@
 #!/bin/bash
 # install.sh — Animated Weather Desklet installer for Cinnamon
+# Works both from cloned repo and via curl | bash
 set -e
 
+REPO="https://raw.githubusercontent.com/Zulus-Code/cinnamon-animated-weather-desklet/master"
 DEST="${HOME}/.local/share/cinnamon/desklets/weather-animated@zulus"
-SRC="$(dirname "$0")"
 
 echo "☀️ Installing Animated Weather Desklet..."
+echo ""
 
 # Create destination
 mkdir -p "$DEST"
 
-# Copy files
-cp -v "$SRC/desklet.js"       "$DEST/" 2>/dev/null || true
-cp -v "$SRC/metadata.json"    "$DEST/" 2>/dev/null || true
-cp -v "$SRC/settings-schema.json" "$DEST/" 2>/dev/null || true
-cp -v "$SRC/stylesheet.css"   "$DEST/" 2>/dev/null || true
+# Check if we're in a git repo (local install)
+if [ -f "desklet.js" ] && [ -f "metadata.json" ]; then
+    echo "📁 Local install found, copying files..."
+    cp -v desklet.js           "$DEST/"
+    cp -v metadata.json        "$DEST/"
+    cp -v settings-schema.json "$DEST/"
+    cp -v stylesheet.css       "$DEST/"
+else
+    echo "📡 Downloading from GitHub..."
+    for f in desklet.js metadata.json settings-schema.json stylesheet.css; do
+        echo "  Downloading $f..."
+        curl -sL "${REPO}/${f}" -o "${DEST}/${f}"
+        if [ ! -s "${DEST}/${f}" ]; then
+            echo "❌ Failed to download $f"
+            exit 1
+        fi
+    done
+fi
 
+echo ""
 echo "✅ Installed to: $DEST"
 echo ""
 echo "⚠️  Restart Cinnamon: Ctrl+Alt+Esc"
 echo "   Then: Right-click desktop → Add Desklet → Animated Weather"
 echo ""
-echo "🔑 Don't forget to get a free API key:"
-echo "   https://openweathermap.org/api"
+echo "🔑 Get a free API key at: https://openweathermap.org/api"
 echo ""
-
-# Check if curl exists and offer to create config
-if command -v curl &>/dev/null; then
-    echo "📡  Checking internet connectivity..."
-    if curl -s --max-time 3 https://openweathermap.org >/dev/null 2>&1; then
-        echo "✅ Internet OK"
-    else
-        echo "⚠️  No internet connection — you'll need to configure API key later"
-    fi
-fi
