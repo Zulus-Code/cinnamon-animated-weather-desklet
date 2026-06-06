@@ -117,4 +117,4 @@ GNU General Public License v3.0 — see [LICENSE](LICENSE).
 
 ---
 
-*Made with 🍻 by [@Kudriashov_Dmitrii](https://t.me/Kudriashov_Dmitrii)*
+*Made by [@Zulus-code](https://github.com/Zulus-code)*
