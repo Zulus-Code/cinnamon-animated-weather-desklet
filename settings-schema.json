@@ -62,6 +62,21 @@
         "default": true,
         "description": "Show background gradient and glass panel"
     },
+    "show-humidity": {
+        "type": "switch",
+        "default": true,
+        "description": "Show humidity"
+    },
+    "show-wind": {
+        "type": "switch",
+        "default": true,
+        "description": "Show wind speed"
+    },
+    "show-pressure": {
+        "type": "switch",
+        "default": true,
+        "description": "Show atmospheric pressure"
+    },
     "opacity": {
         "type": "spinbutton",
         "default": 70,

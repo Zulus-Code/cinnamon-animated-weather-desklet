@@ -65,6 +65,9 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this.settings.bindProperty(Settings.BindingDirection.IN, 'show-forecast', 'showForecast', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'forecast-hours', 'forecastHours', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'show-background', 'showBackground', this._onSettingsChanged.bind(this));
+        this.settings.bindProperty(Settings.BindingDirection.IN, 'show-humidity', 'showHumidity', this._onSettingsChanged.bind(this));
+        this.settings.bindProperty(Settings.BindingDirection.IN, 'show-wind', 'showWind', this._onSettingsChanged.bind(this));
+        this.settings.bindProperty(Settings.BindingDirection.IN, 'show-pressure', 'showPressure', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'opacity', 'opacity', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'width', 'width', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'language', 'language', this._onSettingsChanged.bind(this));

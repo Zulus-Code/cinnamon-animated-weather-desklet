@@ -710,15 +710,19 @@ Renderer.prototype._drawWeather = function (cr, w) {
     cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.7);
     this._cpango(cr, this._('feels_like') + ' ' + feels + unit, cx, topY + 140, 13, false);
 
-    let detailY = topY + 175, detailW = Math.min(w - 80, 300), sX = cx - detailW / 2, cW = detailW / 3;
-    let vals = [hum + '%', wind + ' ' + this._('wind_unit'), wd.main.pressure + ' ' + this._('pressure_unit')];
-    let lbls = [this._('humidity'), this._('wind'), this._('pressure')];
-    for (let i = 0; i < 3; i++) {
-        let ix = sX + cW * i + cW / 2;
-        cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 0.95);
-        this._cpango(cr, vals[i], ix, detailY + 19, 18, true);
-        cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.6);
-        this._cpango(cr, lbls[i], ix, detailY + 37, 10, false);
+    let detailItems = [];
+    if (d.showHumidity !== false) detailItems.push({ val: hum + '%', lbl: this._('humidity') });
+    if (d.showWind !== false) detailItems.push({ val: wind + ' ' + this._('wind_unit'), lbl: this._('wind') });
+    if (d.showPressure !== false) detailItems.push({ val: wd.main.pressure + ' ' + this._('pressure_unit'), lbl: this._('pressure') });
+    if (detailItems.length > 0) {
+        let detailY = topY + 175, detailW = Math.min(w - 80, 300), sX = cx - detailW / 2, cW = detailW / detailItems.length;
+        for (let i = 0; i < detailItems.length; i++) {
+            let ix = sX + cW * i + cW / 2;
+            cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 0.95);
+            this._cpango(cr, detailItems[i].val, ix, detailY + 19, 18, true);
+            cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.6);
+            this._cpango(cr, detailItems[i].lbl, ix, detailY + 37, 10, false);
+        }
     }
     cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.6);
     this._cpango(cr, wd.name + ', ' + (wd.sys.country || ''), cx, topY + 230, 13, false);
