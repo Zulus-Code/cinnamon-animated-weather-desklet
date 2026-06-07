@@ -25,12 +25,13 @@ A beautiful, real-time animated weather desklet for Linux Mint Cinnamon desktop.
 ## ✨ Features
 
 - **Live animated weather** — rain drops, snowflakes, drifting clouds, twinkling stars at night
+- **Transparent background mode** — toggle off the sky gradient and glass panel for a clean, floating look. Unlike other desklets, no visible container borders or backgrounds
 - **Glassmorphism UI** — frosted glass panel with adaptive transparency
 - **Sky gradient** — dynamic sky colours that adapt to weather condition and time of day
 - **Auto location** — detects your city via IP geolocation (or set manually)
 - **Real-time data** — powered by Open-Meteo (free, no API key required)
 - **Hourly forecast** — 6/12/24 hour forecast strip, 8 slots
-- **Configurable** — units, theme (Auto/Glass/Dark), opacity, width, refresh interval
+- **Configurable** — units, theme (Auto/Glass/Dark), opacity, background toggle, width, refresh interval
 - **🌐 Russian language** — interface and settings available in Русский
 - **Lightweight** — ~30fps Cairo-rendered, no GPU needed
 - **No API key required** — Open-Meteo is free and works everywhere (including Russia, China, etc.)
@@ -106,6 +107,7 @@ When switching to Russian:
 | Theme | Auto | Auto (adapts), Glass (always light), Dark |
 | Forecast | ✅ On | Show hourly forecast strip |
 | Forecast hours | 6 h | Forecast range (3–24 h) |
+| Background | ✅ On | Show sky gradient and glass panel (off = transparent, particles only) |
 | Opacity | 70% | Panel transparency |
 | Width | 350 px | Desklet width |
 
