@@ -91,6 +91,9 @@ When switching to Russian:
 | Forecast | ✅ On | Show hourly forecast strip |
 | Forecast hours | 6 h | Forecast range (3–24 h) |
 | Background | ✅ On | Show sky gradient and glass panel (off = transparent, particles only) |
+| Humidity | ✅ On | Show humidity |
+| Wind | ✅ On | Show wind speed |
+| Pressure | ✅ On | Show atmospheric pressure |
 | Opacity | 70% | Panel transparency |
 | Width | 350 px | Desklet width |
 
