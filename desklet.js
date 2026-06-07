@@ -97,7 +97,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
     _setContainerTransparent(transparent) {
         let style = transparent
             ? 'background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important;'
-            : '';
+            : null;
 
         let apply = function (widget) {
             if (!widget || typeof widget.set_style !== 'function') return;
@@ -243,24 +243,29 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
     _animationLoop() {
         if (!this._animating) return;
 
-        let now = Date.now();
-        let dt = (now - this._lastFrameTime) / 1000;
-        this._lastFrameTime = now;
-        if (dt > 0.1) dt = 0.1;
+        try {
+            let now = Date.now();
+            let dt = (now - this._lastFrameTime) / 1000;
+            this._lastFrameTime = now;
+            if (dt > 0.1) dt = 0.1;
 
-        // ── Update scene interpolation ──
-        if (this._sceneBuilder) {
-            this._sceneBuilder.update(dt);
-            this._scene = this._sceneBuilder._current;
-            this._sceneTime += dt;
+            // ── Update scene interpolation ──
+            if (this._sceneBuilder) {
+                this._sceneBuilder.update(dt);
+                this._scene = this._sceneBuilder._current;
+                this._sceneTime += dt;
+            }
+
+            // ── Update particles ──
+            if (this._weather && !this._loading && !this._error) {
+                this._particleSystem.update(dt, this._width, this._height);
+            }
+
+            this._drawArea.queue_repaint();
+        } catch (e) {
+            global.logError('Animation error: ' + e);
         }
 
-        // ── Update particles ──
-        if (this._weather && !this._loading && !this._error) {
-            this._particleSystem.update(dt, this._width, this._height);
-        }
-
-        this._drawArea.queue_repaint();
         this._animationId = Mainloop.timeout_add(33, Lang.bind(this, this._animationLoop));
     }
 

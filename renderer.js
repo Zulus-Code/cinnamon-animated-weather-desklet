@@ -58,26 +58,38 @@ Renderer.prototype.draw = function (area) {
     let w = d._width, h = d._height;
     if (w < 50 || h < 50) return;
 
-    cr.setSourceRGBA(0, 0, 0, 0);
-    cr.paint();
+    try {
+        cr.setSourceRGBA(0, 0, 0, 0);
+        cr.paint();
+    } catch (e) {
+        global.logError('Draw clear error: ' + e);
+        return;
+    }
 
     if (d.showBackground !== false) {
-        // Procedural scene drawing
-        let scene = d._scene || null;
-        this._drawProceduralScene(cr, w, h, scene);
-        this._drawGlassPanel(cr, w, h, scene);
+        try {
+            let scene = d._scene || null;
+            this._drawProceduralScene(cr, w, h, scene);
+        } catch (e) { global.logError('Draw procedural scene error: ' + e); }
+        try {
+            this._drawGlassPanel(cr, w, h, d._scene || null);
+        } catch (e) { global.logError('Draw glass panel error: ' + e); }
     }
 
     // Particles (rain/snow) on top of glass
-    if (d._particleSystem) d._particleSystem.draw(cr);
+    try {
+        if (d._particleSystem) d._particleSystem.draw(cr);
+    } catch (e) { global.logError('Draw particles error: ' + e); }
 
     // UI overlay
-    if (d._loading) this._drawLoading(cr, w, h);
-    else if (d._error) this._drawError(cr, w, h, d._error);
-    else if (d._weather) {
-        this._drawWeather(cr, w);
-        if (d.showForecast && d._forecast) this._drawForecast(cr, w);
-    }
+    try {
+        if (d._loading) this._drawLoading(cr, w, h);
+        else if (d._error) this._drawError(cr, w, h, d._error);
+        else if (d._weather) {
+            this._drawWeather(cr, w);
+            if (d.showForecast && d._forecast) this._drawForecast(cr, w);
+        }
+    } catch (e) { global.logError('Draw UI error: ' + e); }
 };
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -364,7 +376,10 @@ Renderer.prototype._drawCloudLayer = function (cr, w, h, scene, layer) {
     cr.save();
 
     // Set up the mask pattern
-    let pattern = Cairo.Pattern.createForSurface(mask);
+    let pattern;
+    try { pattern = new Cairo.Pattern(mask); } catch (e) {
+        try { pattern = Cairo.Pattern.createForSurface(mask); } catch (e2) { return; }
+    }
     try { pattern.setExtend(Cairo.Extend.REPEAT); } catch (e) {}
 
     // Create transform matrix: scale for parallax + scroll for animation
@@ -520,7 +535,10 @@ Renderer.prototype._drawFog = function (cr, w, h, scene) {
     }
 
     // Create pattern from fog mask
-    let pattern = Cairo.Pattern.createForSurface(this._fogMask);
+    let pattern;
+    try { pattern = new Cairo.Pattern(this._fogMask); } catch (e) {
+        try { pattern = Cairo.Pattern.createForSurface(this._fogMask); } catch (e2) { return; }
+    }
     try { pattern.setExtend(Cairo.Extend.REPEAT); } catch (e) {}
 
     // Slow drift for the fog

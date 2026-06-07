@@ -62,6 +62,18 @@ msgstr "Диапазон прогноза"
 msgid "Show background gradient and glass panel"
 msgstr "Показывать фон и стеклянную панель"
 
+#. settings-schema.json->show-humidity->description
+msgid "Show humidity"
+msgstr "Показывать влажность"
+
+#. settings-schema.json->show-wind->description
+msgid "Show wind speed"
+msgstr "Показывать ветер"
+
+#. settings-schema.json->show-pressure->description
+msgid "Show atmospheric pressure"
+msgstr "Показывать давление"
+
 #. settings-schema.json->opacity->description
 msgid "Panel opacity"
 msgstr "Прозрачность панели"
