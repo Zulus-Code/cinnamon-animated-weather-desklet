@@ -12,6 +12,8 @@ const Soup = imports.gi.Soup;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 const Cairo = imports.cairo;
+const Pango = imports.gi.Pango;
+const PangoCairo = imports.gi.PangoCairo;
 const ByteArray = imports.byteArray;
 
 const UUID = "weather-animated@zulus";
@@ -620,7 +622,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         let main = wData.weather[0];
         let temp = Math.round(wData.main.temp);
         let feels = Math.round(wData.main.feels_like);
-        let hum = wData.main.humidity;
+        let hum = Math.round(wData.main.humidity);
         let wind = Math.round(wData.wind.speed);
         let desc = main.description;
         let icon = main.icon;
@@ -631,66 +633,42 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         let topY = 45;
         let unit = this.units === 'metric' ? '°C' : '°F';
 
-        cr.setFontSize(56);
         cr.setSourceRGBA(1, 1, 1, 1);
-        cr.moveTo(cx - 28, topY + 20);
-        cr.showText(emoji);
+        this._drawPango(cr, emoji, cx - this._pangoWidth(cr, emoji, 56, false) / 2, topY + 20, 56, false);
 
-        cr.setFontSize(54);
-        cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.BOLD);
         cr.setSourceRGBA(textColor[0], textColor[1], textColor[2], 1);
         let tempStr = temp + unit;
-        cr.moveTo(cx - this._textWidth(cr, tempStr) / 2, topY + 90);
-        cr.showText(tempStr);
+        this._drawPango(cr, tempStr, cx - this._pangoWidth(cr, tempStr, 54, true) / 2, topY + 90, 54, true);
 
-        cr.setFontSize(16);
-        cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
         cr.setSourceRGBA(dimColor[0], dimColor[1], dimColor[2], 0.9);
         let descStr = desc.charAt(0).toUpperCase() + desc.slice(1);
-        cr.moveTo(cx - this._textWidth(cr, descStr) / 2, topY + 118);
-        cr.showText(descStr);
+        this._drawPango(cr, descStr, cx - this._pangoWidth(cr, descStr, 16, false) / 2, topY + 118, 16, false);
 
-        cr.setFontSize(13);
         cr.setSourceRGBA(faintColor[0], faintColor[1], faintColor[2], 0.7);
         let feelsStr = this._('feels_like') + ' ' + feels + unit;
-        cr.moveTo(cx - this._textWidth(cr, feelsStr) / 2, topY + 140);
-        cr.showText(feelsStr);
+        this._drawPango(cr, feelsStr, cx - this._pangoWidth(cr, feelsStr, 13, false) / 2, topY + 140, 13, false);
 
         let detailY = topY + 175;
         let detailW = Math.min(w - 80, 300);
         let startX = cx - detailW / 2;
         let colW = detailW / 3;
 
-        let icons = ['💧', '💨', '🌡️'];
         let vals = [hum + '%', wind + ' ' + this._('wind_unit'), wData.main.pressure + ' ' + this._('pressure_unit')];
         let lbls = [this._('humidity'), this._('wind'), this._('pressure')];
 
-        cr.setFontSize(20);
         for (let i = 0; i < 3; i++) {
             let ix = startX + colW * i + colW / 2;
-            cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
-            cr.setSourceRGBA(dimColor[0], dimColor[1], dimColor[2], 0.8);
-            cr.moveTo(ix - this._textWidth(cr, icons[i]) / 2, detailY);
-            cr.showText(icons[i]);
 
-            cr.setFontSize(15);
-            cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.BOLD);
             cr.setSourceRGBA(textColor[0], textColor[1], textColor[2], 0.95);
-            cr.moveTo(ix - this._textWidth(cr, vals[i]) / 2, detailY + 22);
-            cr.showText(vals[i]);
+            this._drawPango(cr, vals[i], ix - this._pangoWidth(cr, vals[i], 18, true) / 2, detailY + 19, 18, true);
 
-            cr.setFontSize(10);
-            cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
             cr.setSourceRGBA(faintColor[0], faintColor[1], faintColor[2], 0.6);
-            cr.moveTo(ix - this._textWidth(cr, lbls[i]) / 2, detailY + 37);
-            cr.showText(lbls[i]);
+            this._drawPango(cr, lbls[i], ix - this._pangoWidth(cr, lbls[i], 10, false) / 2, detailY + 37, 10, false);
         }
 
-        cr.setFontSize(13);
         cr.setSourceRGBA(faintColor[0], faintColor[1], faintColor[2], 0.6);
         let cityStr = wData.name + ', ' + (wData.sys.country || '');
-        cr.moveTo(cx - this._textWidth(cr, cityStr) / 2, topY + 218);
-        cr.showText(cityStr);
+        this._drawPango(cr, cityStr, cx - this._pangoWidth(cr, cityStr, 13, false) / 2, topY + 230, 13, false);
     }
 
     _drawForecast(cr, w) {
@@ -702,7 +680,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         let dimColor = isDark ? [136 / 255, 153 / 255, 204 / 255] : [1, 1, 1];
         let faintColor = isDark ? [85 / 255, 102 / 255, 136 / 255] : [1, 1, 1];
 
-        let forecastY = 295;
+        let forecastY = 300;
         let pad = 30;
         let fw = w - pad * 2;
         let maxSlots = Math.min(this.forecastHours / 3 || 6, 8);
@@ -715,11 +693,8 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         cr.lineTo(w - pad - 5, forecastY - 5);
         cr.stroke();
 
-        cr.setFontSize(10);
-        cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
         cr.setSourceRGBA(faintColor[0], faintColor[1], faintColor[2], 0.5);
-        cr.moveTo(pad + 5, forecastY - 10);
-        cr.showText(this._('forecast'));
+        this._drawPango(cr, this._('forecast'), pad + 5, forecastY - 10, 10, false);
 
         let list = this._forecast.list.slice(0, maxSlots);
         for (let i = 0; i < list.length; i++) {
@@ -730,28 +705,19 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
             let hours = dt.getHours().toString().padStart(2, '0');
             let mins = dt.getMinutes().toString().padStart(2, '0');
 
-            cr.setFontSize(10);
-            cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
             cr.setSourceRGBA(dimColor[0], dimColor[1], dimColor[2], 0.7);
             let timeStr = hours + ':' + mins;
-            cr.moveTo(fx - this._textWidth(cr, timeStr) / 2, forecastY + 10);
-            cr.showText(timeStr);
+            this._drawPango(cr, timeStr, fx - this._pangoWidth(cr, timeStr, 10, false) / 2, forecastY + 10, 10, false);
 
             let emoji = this._iconToEmoji(item.weather[0].icon, item.weather[0].id);
-            cr.setFontSize(20);
-            cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
             cr.setSourceRGBA(1, 1, 1, 0.9);
-            cr.moveTo(fx - 10, forecastY + 40);
-            cr.showText(emoji);
+            this._drawPango(cr, emoji, fx - this._pangoWidth(cr, emoji, 20, false) / 2, forecastY + 40, 20, false);
 
             let ft = Math.round(item.main.temp);
             let unit = this.units === 'metric' ? '°' : '°F';
-            cr.setFontSize(13);
-            cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.BOLD);
             cr.setSourceRGBA(textColor[0], textColor[1], textColor[2], 0.95);
             let ftStr = ft + unit;
-            cr.moveTo(fx - this._textWidth(cr, ftStr) / 2, forecastY + 65);
-            cr.showText(ftStr);
+            this._drawPango(cr, ftStr, fx - this._pangoWidth(cr, ftStr, 13, true) / 2, forecastY + 65, 13, true);
         }
 
         cr.restore();
@@ -762,12 +728,9 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         let isDark = (t === 'dark') || (t === 'auto' && this._isNight());
         let textColor = isDark ? [224 / 255, 232 / 255, 1] : [1, 1, 1];
 
-        cr.setFontSize(18);
-        cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
         cr.setSourceRGBA(textColor[0], textColor[1], textColor[2], 0.7);
         let msg = this._('loading');
-        cr.moveTo(w / 2 - this._textWidth(cr, msg) / 2, h / 2);
-        cr.showText(msg);
+        this._drawPango(cr, msg, w / 2 - this._pangoWidth(cr, msg, 18, false) / 2, h / 2, 18, false);
     }
 
     _drawError(cr, w, h, errInfo) {
@@ -786,29 +749,47 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
             errMsg = '';
         }
 
-        cr.setFontSize(14);
-        cr.selectFontFace('Ubuntu, Sans', Cairo.FontSlant.NORMAL, Cairo.FontWeight.NORMAL);
         cr.setSourceRGBA(textColor[0], textColor[1], textColor[2], 0.8);
 
         let lines = errMsg.split('\n');
         let ly = h / 2 - lines.length * 10;
         for (let li = 0; li < lines.length; li++) {
             let line = lines[li];
-            if (this._textWidth(cr, line) > w - 60) {
-                while (this._textWidth(cr, line + '...') > w - 60 && line.length > 3)
+            if (this._pangoWidth(cr, line, 14, false) > w - 60) {
+                while (this._pangoWidth(cr, line + '...', 14, false) > w - 60 && line.length > 3)
                     line = line.slice(0, -1);
                 line += '...';
             }
-            cr.moveTo(w / 2 - this._textWidth(cr, line) / 2, ly);
-            cr.showText(line);
+            this._drawPango(cr, line, w / 2 - this._pangoWidth(cr, line, 14, false) / 2, ly, 14, false);
             ly += 22;
         }
     }
 
-    _textWidth(cr, text) {
+    // Render text using PangoCairo (supports emoji via font fallback).
+    // x, y = baseline position (compatible with old cr.showText() convention).
+    // size = font size in points. bold = true/false.
+    _drawPango(cr, text, x, y, size, bold) {
+        let layout = PangoCairo.create_layout(cr);
+        layout.set_text(text, -1);
+        let fd = Pango.FontDescription.from_string('Ubuntu, Sans ' + size);
+        if (bold) fd.set_weight(Pango.Weight.BOLD);
+        layout.set_font_description(fd);
+        let [tw, th] = layout.get_pixel_size();
+        let base = layout.get_baseline() / Pango.SCALE;
+        cr.moveTo(x, y - base);
+        PangoCairo.show_layout(cr, layout);
+    }
+
+    // Measure text width using Pango. size = font size, bold = true/false.
+    _pangoWidth(cr, text, size, bold) {
         try {
-            let extents = cr.textExtents(text);
-            return extents.xAdvance || extents.width || text.length * 9;
+            let layout = PangoCairo.create_layout(cr);
+            layout.set_text(text, -1);
+            let fd = Pango.FontDescription.from_string('Ubuntu, Sans ' + size);
+            if (bold) fd.set_weight(Pango.Weight.BOLD);
+            layout.set_font_description(fd);
+            let [w, h] = layout.get_pixel_size();
+            return w;
         } catch (e) {
             return text.length * 9;
         }
@@ -842,7 +823,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
     }
 
     _iconToEmoji(icon, id) {
-        if (!icon) return '🌤️';
+        if (!icon) return '☀️';
         let isNight = icon.endsWith('n');
 
         if (id >= 200 && id < 300) return '⛈️';
