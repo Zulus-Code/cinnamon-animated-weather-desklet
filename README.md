@@ -125,11 +125,16 @@ When switching to Russian:
 
 ## 🛠️ Development
 
-The desklet is a single self-contained file rendered entirely via Cairo. The structure:
+The desklet is split into logical modules for maintainability:
 
 ```
 weather-animated@zulus/
-├── desklet.js           # Main logic: particles, sky, UI, weather API, i18n
+├── desklet.js           # Main class — wires modules together, settings, lifecycle
+├── constants.js         # Colors, WMO weather codes, i18n strings, emoji map
+├── weatherService.js    # Open-Meteo API, geocoding, forecast builder
+├── renderer.js          # Cairo/PangoCairo rendering — sky, glass panel, text, particles
+├── particleSystem.js    # Particle physics — rain, snow, clouds, stars
+├── utils.js             # Helpers — text width, local date parsing
 ├── settings-schema.json # Settings UI definition
 ├── metadata.json        # Desklet metadata
 ├── stylesheet.css       # Container styles
@@ -141,20 +146,27 @@ weather-animated@zulus/
 └── LICENSE              # GPL-3.0
 ```
 
+### Module roles
+
+| Module | Lines | Responsibility |
+|--------|-------|---------------|
+| `desklet.js` | ~250 | Desklet class, settings binding, lifecycle, animation loop, container transparency |
+| `constants.js` | ~125 | Sky/palette colors, WMO→description dict (en/ru), emoji mapping, i18n strings |
+| `weatherService.js` | ~245 | Open-Meteo API fetch, geocoding (Open-Meteo + ip-api.com), WMO→OWM ID mapping, forecast builder |
+| `renderer.js` | ~300 | All drawing: sky gradient, glass panel, current weather UI, forecast strip, loading/error states |
+| `particleSystem.js` | ~230 | Particle classes, physics update, per-condition particle spawning |
+| `utils.js` | ~50 | `_pangoWidth()`, `_parseLocalDate()`, `_getMinutes()` |
+
 ### Architecture
 
 - **Class-based** ES6 JavaScript (Cinnamon/GJS compatible)
-- **Cairo rendering** — all UI drawn via Cairo on `St.DrawingArea`
-- **Particle system** — lightweight physics for rain/snow/clouds/stars
-- **HTTP** — libsoup2 (queue_message) / libsoup3 (send_and_read_async) / blocking curl fallback
-- **i18n** — custom `STRINGS` dict + `_(key)` helper for Cairo text; Gettext `.po` files for settings dialog
+- **Cairo + PangoCairo rendering** — all UI drawn via Cairo on `St.DrawingArea`, text through PangoCairo for emoji support
+- **Particle system** — lightweight physics for rain/snow/clouds/stars in a dedicated module
+- **HTTP** — libsoup2 (queue_message) / libsoup3 (send_and_read_async) / blocking curl fallback, encapsulated in `weatherService.js`
+- **i18n** — custom `STRINGS` dict + `_(key)` helper in `constants.js`; Gettext `.po` files for settings dialog
 - **Weather API** — [Open-Meteo](https://open-meteo.com/) (free, no API key). Uses WMO weather codes mapped to OWM-compatible IDs for rendering compatibility
 - **Geocoding** — [Open-Meteo Geocoding API](https://open-meteo.com/en/docs/geocoding-api) for city search, [ip-api.com](http://ip-api.com/) for auto-location
 - **No dependencies** — pure JavaScript, no Node.js, no WebKit
-
-### Building from source
-
-No build step required — pure JavaScript, drop-in install.
 
 ## 📄 License
 
