@@ -28,18 +28,19 @@ A beautiful, real-time animated weather desklet for Linux Mint Cinnamon desktop.
 - **Glassmorphism UI** — frosted glass panel with adaptive transparency
 - **Sky gradient** — dynamic sky colours that adapt to weather condition and time of day
 - **Auto location** — detects your city via IP geolocation (or set manually)
-- **Real-time data** — powered by OpenWeatherMap (free API)
-- **Hourly forecast** — 6/12/24 hour forecast strip
+- **Real-time data** — powered by Open-Meteo (free, no API key required)
+- **Hourly forecast** — 6/12/24 hour forecast strip, 8 slots
 - **Configurable** — units, theme (Auto/Glass/Dark), opacity, width, refresh interval
 - **🌐 Russian language** — interface and settings available in Русский
 - **Lightweight** — ~30fps Cairo-rendered, no GPU needed
+- **No API key required** — Open-Meteo is free and works everywhere (including Russia, China, etc.)
 
 ## 📦 Installation
 
 ### Prerequisites
 
 - **Linux Mint 20+** (or any Cinnamon desktop ≥ 4.6)
-- **OpenWeatherMap API key** — [get one free](https://openweathermap.org/api) (free tier: 60 calls/min)
+- **Internet connection** (for weather data)
 
 ### Install
 
@@ -59,9 +60,10 @@ Ctrl+Alt+Esc
 1. Right-click on desktop → **Add Desklet**
 2. Find **Анимированная погода** (or **Animated Weather**) → click **Add**
 3. Right-click the desklet → **Configure**
-4. Enter your **OpenWeatherMap API Key**
-5. Choose your **city** (or leave `auto`)
-6. Select **Language** → **Русский** (optional)
+4. Choose your **city** (or leave `auto`)
+5. Select **Language** → **Русский** (optional)
+
+That's it — no API key needed. Works out of the box.
 
 ### Updating
 
@@ -97,8 +99,7 @@ When switching to Russian:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| API Key | — | Your OpenWeatherMap API key (required) |
-| Location | `auto` | City name or 'auto' for IP geolocation |
+| Location | `auto` | City name, `lat,lon` coordinates, or `auto` for IP geolocation |
 | Units | Celsius | °C or °F |
 | Language | English | Interface language (English / Русский) |
 | Refresh | 10 min | How often to fetch weather data |
@@ -145,6 +146,8 @@ weather-animated@zulus/
 - **Particle system** — lightweight physics for rain/snow/clouds/stars
 - **HTTP** — libsoup2 (queue_message) / libsoup3 (send_and_read_async) / blocking curl fallback
 - **i18n** — custom `STRINGS` dict + `_(key)` helper for Cairo text; Gettext `.po` files for settings dialog
+- **Weather API** — [Open-Meteo](https://open-meteo.com/) (free, no API key). Uses WMO weather codes mapped to OWM-compatible IDs for rendering compatibility
+- **Geocoding** — [Open-Meteo Geocoding API](https://open-meteo.com/en/docs/geocoding-api) for city search, [ip-api.com](http://ip-api.com/) for auto-location
 - **No dependencies** — pure JavaScript, no Node.js, no WebKit
 
 ### Building from source
