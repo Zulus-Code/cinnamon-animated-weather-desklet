@@ -160,4 +160,4 @@ GNU General Public License v3.0 — see [LICENSE](LICENSE).
 
 ---
 
-*Made by [@Zulus-code](https://github.com/Zulus-code)*
+*Made by [@Zulus-code](https://github.com/Zulus-code)* • Version **2.1.0** — see [CHANGELOG](CHANGELOG.md) for release history.
