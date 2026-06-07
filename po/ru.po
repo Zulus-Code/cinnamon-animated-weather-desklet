@@ -58,6 +58,10 @@ msgstr "Показывать почасовой прогноз"
 msgid "Forecast range"
 msgstr "Диапазон прогноза"
 
+#. settings-schema.json->show-background->description
+msgid "Show background gradient and glass panel"
+msgstr "Показывать фон и стеклянную панель"
+
 #. settings-schema.json->opacity->description
 msgid "Panel opacity"
 msgstr "Прозрачность панели"

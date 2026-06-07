@@ -57,6 +57,11 @@
         "description": "Forecast range",
         "dependency": "show-forecast"
     },
+    "show-background": {
+        "type": "switch",
+        "default": true,
+        "description": "Show background gradient and glass panel"
+    },
     "opacity": {
         "type": "spinbutton",
         "default": 70,

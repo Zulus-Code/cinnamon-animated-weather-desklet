@@ -58,6 +58,10 @@ msgstr ""
 msgid "Forecast range"
 msgstr ""
 
+#. settings-schema.json->show-background->description
+msgid "Show background gradient and glass panel"
+msgstr ""
+
 #. settings-schema.json->opacity->description
 msgid "Panel opacity"
 msgstr ""

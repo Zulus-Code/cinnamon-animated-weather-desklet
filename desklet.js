@@ -270,6 +270,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this.settings.bindProperty(Settings.BindingDirection.IN, 'theme', 'theme', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'show-forecast', 'showForecast', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'forecast-hours', 'forecastHours', this._onSettingsChanged.bind(this));
+        this.settings.bindProperty(Settings.BindingDirection.IN, 'show-background', 'showBackground', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'opacity', 'opacity', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'width', 'width', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'language', 'language', this._onSettingsChanged.bind(this));
@@ -289,6 +290,27 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         });
         this._drawArea.connect('repaint', Lang.bind(this, this._draw));
         this.setContent(this._drawArea);
+    }
+
+    /* Recursively force all widgets in the desklet to transparent/normal */
+    _setContainerTransparent(transparent) {
+        let style = transparent
+            ? 'background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important;'
+            : '';
+
+        let apply = function(widget) {
+            if (!widget || typeof widget.set_style !== 'function') return;
+            try { widget.set_style(style); } catch (e) {}
+            if (typeof widget.get_children === 'function') {
+                let kids = widget.get_children();
+                for (let i = 0; i < kids.length; i++) apply(kids[i]);
+            }
+        };
+
+        if (this.actor) apply(this.actor);
+        if (this._drawArea) {
+            try { this._drawArea.set_style(style); } catch (e) {}
+        }
     }
 
     on_desklet_view_geometry_changed() {
@@ -327,6 +349,12 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
             this._refreshWeather();
             return true;
         }));
+
+        // Toggle container background for transparent mode.
+        // The desklet hierarchy (St.BoxLayout > St.Bin > our widget) may
+        // inherit a background from the theme, so we recurse through all
+        // children and force them transparent.
+        this._setContainerTransparent(this.showBackground === false);
 
         this._initParticles();
         if (this._drawArea) this._drawArea.queue_repaint();
@@ -436,9 +464,12 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         cr.setSourceRGBA(0, 0, 0, 0);
         cr.paint();
 
-        this._drawSky(cr, w, h);
+        if (this.showBackground !== false) {
+            this._drawSky(cr, w, h);
+            this._drawGlassPanel(cr, w, h);
+        }
+
         this._drawParticles(cr, w, h);
-        this._drawGlassPanel(cr, w, h);
 
         if (this._loading) {
             this._drawLoading(cr, w, h);
