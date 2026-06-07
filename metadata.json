@@ -2,7 +2,7 @@
     "uuid": "weather-animated@zulus",
     "name": "Animated Weather",
     "description": "Real-time animated weather desklet with live particle effects — rain, snow, clouds, stars, and dynamic sky gradients",
-    "version": "2.1.0",
+    "version": "2.1.1",
     "max-instances": "1",
     "prevent-decorations": false,
     "author": "zulus"

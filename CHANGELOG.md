@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.1.1] - 2026-06-07
+
+### Fixed
+- Encapsulation: Renderer no longer accesses private fields (`_d._sceneBuilder`, `_d._sceneTime`); scene now carries `cloudOffsets`, Renderer has its own internal clock
+- Double `_initParticles()` call on settings change (added `_skipParticleInit` flag)
+- Unnecessary weather API refetch on cosmetic-only setting changes (track `_lastLocation`/`_lastUnits`)
+- Moon phase calculation off-by-one on 31st day of month (`((dayOfMonth - 1) % 29.53) / 29.53`)
+- Hardcoded forecast Y position now relative to desklet height (`Math.min(300, h * 0.75)`)
+- Cairo context memory leak — `cr.$dispose()` at end of `draw()`
+- Removed duplicate `_hexToRgba` from renderer.js (now uses `Utils._hexToRgba`)
+
+---
+
 ## [2.1.0] - 2026-06-07
 
 ### Added
