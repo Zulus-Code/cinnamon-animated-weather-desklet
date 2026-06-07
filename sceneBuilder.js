@@ -258,6 +258,10 @@ SceneBuilder.prototype.getNoiseTex = function () {
     return this._noiseTex;
 };
 
+SceneBuilder.prototype.getDefaultScene = function () {
+    return this._defaultScene();
+};
+
 /* ── Main entry point: build scene from weather data ───────────────────── */
 SceneBuilder.prototype.buildScene = function (weatherData, sunriseMinutes,
                                               sunsetMinutes, language) {
@@ -455,7 +459,7 @@ SceneBuilder.prototype._calcSunMoon = function (sunriseMinutes, sunsetMinutes) {
     // Approximate from day of month (very rough)
     let dayOfMonth = now.getDate();
     let moonIllum = 0.5 + 0.5 * Math.sin((dayOfMonth - 6) / 15 * Math.PI);
-    let moonPhase = (dayOfMonth % 30) / 30;
+    let moonPhase = ((dayOfMonth - 1) % 29.53) / 29.53;
 
     return [sunElevation, twilight, isNight, moonEl, moonVisible, moonIllum];
 };
@@ -656,6 +660,7 @@ SceneBuilder.prototype.update = function (dt) {
         this._cloudOffsets[i] += dt * this._target.cloudSpeed[i] * (i + 1);
         if (this._cloudOffsets[i] > 1000) this._cloudOffsets[i] -= 1000;
     }
+    this._current.cloudOffsets = this._cloudOffsets.slice();
 
     // Interpolate current → target
     let speed = Math.min(1, this._transitionSpeed * dt);

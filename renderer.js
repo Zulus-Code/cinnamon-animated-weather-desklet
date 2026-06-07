@@ -9,6 +9,7 @@ const PangoCairo = imports.gi.PangoCairo;
 const Cairo = imports.cairo;
 
 const Constants = imports.constants;
+const Utils = imports.utils;
 
 /* ── Renderer constructor ────────────────────────────────────────────────── */
 function Renderer(desklet) {
@@ -24,6 +25,10 @@ function Renderer(desklet) {
 
     // Noise texture reference (set from sceneBuilder)
     this._noiseTex = null;
+
+    // Internal clock for fog animation drift
+    this._time = 0;
+    this._lastDrawTime = 0;
 }
 
 /* ── Set noise texture reference (called by desklet after SceneBuilder init) ── */
@@ -58,6 +63,14 @@ Renderer.prototype.draw = function (area) {
     let w = d._width, h = d._height;
     if (w < 50 || h < 50) return;
 
+    // Internal time keeping (for fog animation etc.)
+    let now = Date.now();
+    if (this._lastDrawTime) {
+        this._time += (now - this._lastDrawTime) / 1000;
+        if (this._time > 10000) this._time = 0; // prevent overflow
+    }
+    this._lastDrawTime = now;
+
     try {
         cr.setSourceRGBA(0, 0, 0, 0);
         cr.paint();
@@ -90,6 +103,9 @@ Renderer.prototype.draw = function (area) {
             if (d.showForecast && d._forecast) this._drawForecast(cr, w);
         }
     } catch (e) { global.logError('Draw UI error: ' + e); }
+
+    // Release Cairo context to prevent memory leaks in GJS
+    try { cr.$dispose(); } catch (e) {}
 };
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -133,7 +149,7 @@ Renderer.prototype._drawSimpleFallback = function (cr, w, h) {
     else c = night ? Constants.COLORS.sky.stormy : Constants.COLORS.sky.cloudy_day;
 
     let pat = new Cairo.LinearGradient(0, 0, 0, h);
-    let c1 = this._hexToRgba(c[0]), c2 = this._hexToRgba(c[1]);
+    let c1 = Utils._hexToRgba(c[0]), c2 = Utils._hexToRgba(c[1]);
     pat.addColorStopRGBA(0, c1[0], c1[1], c1[2], 1);
     pat.addColorStopRGBA(1, c2[0], c2[1], c2[2], 1);
     cr.setSource(pat);
@@ -343,7 +359,7 @@ Renderer.prototype._drawCloudLayer = function (cr, w, h, scene, layer) {
 
     let density = scene.cloudDensity[layer];
     let scale = scene.cloudScale[layer];
-    let offset = this._d._sceneBuilder ? this._d._sceneBuilder.getCloudOffset(layer) : 0;
+    let offset = (scene.cloudOffsets && scene.cloudOffsets[layer]) || 0;
     let opacity = scene.cloudOpacity[layer];
 
     // Get or create cloud mask surface for this density
@@ -542,7 +558,7 @@ Renderer.prototype._drawFog = function (cr, w, h, scene) {
     try { pattern.setExtend(Cairo.Extend.REPEAT); } catch (e) {}
 
     // Slow drift for the fog
-    let time = this._d._sceneTime || 0;
+    let time = this._time;
     let tx = time * 2;
     let ty = time * 0.5;
     try {
@@ -751,7 +767,7 @@ Renderer.prototype._drawForecast = function (cr, w) {
     let d = this._d;
     if (!d._forecast || !d._forecast.list) return;
     let tc = this._themeColors();
-    let fY = 300, pad = 30, fw = w - pad * 2;
+    let fY = Math.min(300, d._height * 0.75), pad = 30, fw = w - pad * 2;
     let maxSlots = Math.min(d.forecastHours / 3 || 6, 8), step = fw / maxSlots;
 
     cr.save();
@@ -872,15 +888,6 @@ Renderer.prototype._ = function (key) {
     let lang = this._d.language || 'en';
     let dict = Constants.STRINGS[lang] || Constants.STRINGS.en;
     return dict[key] !== undefined ? dict[key] : Constants.STRINGS.en[key] || key;
-};
-
-/* ── Hex → RGBA helper ───────────────────────────────────────────────────── */
-Renderer.prototype._hexToRgba = function (hex) {
-    return [
-        parseInt(hex.slice(1, 3), 16) / 255,
-        parseInt(hex.slice(3, 5), 16) / 255,
-        parseInt(hex.slice(5, 7), 16) / 255
-    ];
 };
 
 var Renderer = Renderer;

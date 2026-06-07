@@ -46,8 +46,11 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
 
         // ── Scene system ──
         this._sceneBuilder = new SceneBuilderModule.SceneBuilder();
-        this._scene = this._sceneBuilder._defaultScene(); // initial scene
+        this._scene = this._sceneBuilder.getDefaultScene(); // initial scene
         this._sceneTime = 0;
+        this._skipParticleInit = false;
+        this._lastLocation = null;
+        this._lastUnits = null;
 
         // Create service modules
         this._weatherService = new WeatherServiceModule.WeatherService();
@@ -155,9 +158,21 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         }));
 
         this._setContainerTransparent(this.showBackground === false);
-        this._initParticles();
+
+        // Refresh weather only when location or units actually changed (Fix #3)
+        let locationChanged = (this._lastLocation !== this.location) ||
+                              (this._lastUnits !== this.units);
+        this._lastLocation = this.location;
+        this._lastUnits = this.units;
+
+        if (locationChanged) {
+            this._skipParticleInit = true; // _onWeatherLoaded will handle init (Fix #2)
+            this._refreshWeather();
+        } else {
+            this._initParticles();
+        }
+
         if (this._drawArea) this._drawArea.queue_repaint();
-        this._refreshWeather();
     }
 
     /* ── Particle initialisation ────────────────────────────────────────── */
@@ -197,6 +212,12 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this._sunsetMinutes = data.sunsetMinutes;
         this._loading = false;
         this._error = null;
+
+        // _onWeatherLoaded always re-inits particles with fresh weather data.
+        // The _skipParticleInit flag marks that this call originated from
+        // _onSettingsChanged (which removed its own direct call), so the
+        // init always happens exactly once here (Fix #2).
+        this._skipParticleInit = false;
         this._initParticles();
 
         // Update scene target from weather data
