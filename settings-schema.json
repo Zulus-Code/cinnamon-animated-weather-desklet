@@ -1,10 +1,4 @@
 {
-    "api-key": {
-        "type": "entry",
-        "default": "",
-        "description": "OpenWeatherMap API Key",
-        "tooltip": "Get your free key at https://openweathermap.org/api (free tier: 60 calls/min)"
-    },
     "location": {
         "type": "entry",
         "default": "auto",

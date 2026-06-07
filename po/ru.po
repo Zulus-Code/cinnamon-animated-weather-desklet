@@ -26,14 +26,6 @@ msgstr "Анимированная погода"
 msgid "Real-time animated weather desklet with live particle effects — rain, snow, clouds, stars, and dynamic sky gradients"
 msgstr "Десклет погоды с живыми анимациями — дождь, снег, облака, звёзды и динамическое небо"
 
-#. settings-schema.json->api-key->description
-msgid "OpenWeatherMap API Key"
-msgstr "API ключ OpenWeatherMap"
-
-#. settings-schema.json->api-key->tooltip
-msgid "Get your free key at https://openweathermap.org/api (free tier: 60 calls/min)"
-msgstr "Получите бесплатный ключ на https://openweathermap.org/api (бесплатно: 60 запросов/мин)"
-
 #. settings-schema.json->location->description
 msgid "City name or 'auto' for IP geolocation"
 msgstr "Название города или 'auto' для определения по IP"

@@ -1,5 +1,6 @@
 /* weather-animated@zulus - desklet.js
  * Animated real-time weather desklet for Cinnamon (Linux Mint)
+ * Uses Open-Meteo API (no API key required)
  */
 
 const Desklet = imports.ui.desklet;
@@ -44,9 +45,6 @@ const STRINGS = {
         pressure:          'Pressure',
         forecast:          'Forecast',
         loading:           'Loading weather...',
-        no_api_key:        "No API key configured.\nGet one free at openweathermap.org/api",
-        check_key_short:   'Check API key in desklet settings',
-        check_key_long:    'Check API key in desklet settings \u2192 right click, Configure',
         unknown_api_err:   'Unknown API error',
         parse_err:         'Parse error',
         api_err:           'Weather API error',
@@ -56,6 +54,7 @@ const STRINGS = {
         no_soup:           'No Soup async method available',
         wind_unit:         'km/h',
         pressure_unit:     'hPa',
+        resolve_err:       'Could not determine location',
     },
     ru: {
         feels_like:        '\u041E\u0449\u0443\u0449\u0430\u0435\u0442\u0441\u044F \u043A\u0430\u043A',
@@ -64,9 +63,6 @@ const STRINGS = {
         pressure:          '\u0414\u0430\u0432\u043B\u0435\u043D\u0438\u0435',
         forecast:          '\u041F\u0440\u043E\u0433\u043D\u043E\u0437',
         loading:           '\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043F\u043E\u0433\u043E\u0434\u044B...',
-        no_api_key:        'API \u043A\u043B\u044E\u0447 \u043D\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D.\n\u041F\u043E\u043B\u0443\u0447\u0438\u0442\u0435 \u0431\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u043E \u043D\u0430 openweathermap.org/api',
-        check_key_short:   '\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 API \u043A\u043B\u044E\u0447 \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445',
-        check_key_long:    '\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 API \u043A\u043B\u044E\u0447 \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445 \u2192 \u041F\u041A\u041C, Configure',
         unknown_api_err:   '\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430 API',
         parse_err:         '\u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u0430\u0440\u0441\u0438\u043D\u0433\u0430',
         api_err:           '\u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u043E\u0433\u043E\u0434\u043D\u043E\u0433\u043E API',
@@ -76,8 +72,110 @@ const STRINGS = {
         no_soup:           '\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0433\u043E \u043C\u0435\u0442\u043E\u0434\u0430 Soup async',
         wind_unit:         '\u043C/\u0441',
         pressure_unit:     '\u0433\u041F\u0430',
+        resolve_err:       '\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435',
     }
 };
+
+/* WMO weather code → description lookup */
+const WMO_DESCRIPTIONS = {
+    en: {
+        0: 'clear sky',
+        1: 'mainly clear',
+        2: 'partly cloudy',
+        3: 'overcast',
+        45: 'foggy',
+        48: 'depositing rime fog',
+        51: 'light drizzle',
+        53: 'moderate drizzle',
+        55: 'dense drizzle',
+        56: 'light freezing drizzle',
+        57: 'dense freezing drizzle',
+        61: 'slight rain',
+        63: 'moderate rain',
+        65: 'heavy rain',
+        66: 'light freezing rain',
+        67: 'heavy freezing rain',
+        71: 'slight snow',
+        73: 'moderate snow',
+        75: 'heavy snow',
+        77: 'snow grains',
+        80: 'slight rain showers',
+        81: 'moderate rain showers',
+        82: 'violent rain showers',
+        85: 'slight snow showers',
+        86: 'heavy snow showers',
+        95: 'thunderstorm',
+        96: 'thunderstorm with slight hail',
+        99: 'thunderstorm with heavy hail'
+    },
+    ru: {
+        0: '\u044F\u0441\u043D\u043E',
+        1: '\u043F\u0440\u0435\u0438\u043C\u0443\u0449\u0435\u0441\u0442\u0432\u0435\u043D\u043D\u043E \u044F\u0441\u043D\u043E',
+        2: '\u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u0430\u044F \u043E\u0431\u043B\u0430\u0447\u043D\u043E\u0441\u0442\u044C',
+        3: '\u043F\u0430\u0441\u043C\u0443\u0440\u043D\u043E',
+        45: '\u0442\u0443\u043C\u0430\u043D',
+        48: '\u043B\u0435\u0434\u044F\u043D\u043E\u0439 \u0442\u0443\u043C\u0430\u043D',
+        51: '\u043B\u0451\u0433\u043A\u0430\u044F \u043C\u043E\u0440\u043E\u0441\u044C',
+        53: '\u0443\u043C\u0435\u0440\u0435\u043D\u043D\u0430\u044F \u043C\u043E\u0440\u043E\u0441\u044C',
+        55: '\u0441\u0438\u043B\u044C\u043D\u0430\u044F \u043C\u043E\u0440\u043E\u0441\u044C',
+        56: '\u043B\u0451\u0433\u043A\u0430\u044F \u043B\u0435\u0434\u044F\u043D\u0430\u044F \u043C\u043E\u0440\u043E\u0441\u044C',
+        57: '\u0441\u0438\u043B\u044C\u043D\u0430\u044F \u043B\u0435\u0434\u044F\u043D\u0430\u044F \u043C\u043E\u0440\u043E\u0441\u044C',
+        61: '\u043D\u0435\u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0434\u043E\u0436\u0434\u044C',
+        63: '\u0443\u043C\u0435\u0440\u0435\u043D\u043D\u044B\u0439 \u0434\u043E\u0436\u0434\u044C',
+        65: '\u0441\u0438\u043B\u044C\u043D\u044B\u0439 \u0434\u043E\u0436\u0434\u044C',
+        66: '\u043D\u0435\u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u043B\u0435\u0434\u044F\u043D\u043E\u0439 \u0434\u043E\u0436\u0434\u044C',
+        67: '\u0441\u0438\u043B\u044C\u043D\u044B\u0439 \u043B\u0435\u0434\u044F\u043D\u043E\u0439 \u0434\u043E\u0436\u0434\u044C',
+        71: '\u043D\u0435\u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0441\u043D\u0435\u0433',
+        73: '\u0443\u043C\u0435\u0440\u0435\u043D\u043D\u044B\u0439 \u0441\u043D\u0435\u0433',
+        75: '\u0441\u0438\u043B\u044C\u043D\u044B\u0439 \u0441\u043D\u0435\u0433',
+        77: '\u0441\u043D\u0435\u0436\u043D\u044B\u0435 \u0437\u0451\u0440\u043D\u0430',
+        80: '\u043D\u0435\u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u043B\u0438\u0432\u0435\u043D\u044C',
+        81: '\u0443\u043C\u0435\u0440\u0435\u043D\u043D\u044B\u0439 \u043B\u0438\u0432\u0435\u043D\u044C',
+        82: '\u0441\u0438\u043B\u044C\u043D\u044B\u0439 \u043B\u0438\u0432\u0435\u043D\u044C',
+        85: '\u043D\u0435\u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0441\u043D\u0435\u0433\u043E\u043F\u0430\u0434',
+        86: '\u0441\u0438\u043B\u044C\u043D\u044B\u0439 \u0441\u043D\u0435\u0433\u043E\u043F\u0430\u0434',
+        95: '\u0433\u0440\u043E\u0437\u0430',
+        96: '\u0433\u0440\u043E\u0437\u0430 \u0441 \u0433\u0440\u0430\u0434\u043E\u043C',
+        99: '\u0441\u0438\u043B\u044C\u043D\u0430\u044F \u0433\u0440\u043E\u0437\u0430 \u0441 \u0433\u0440\u0430\u0434\u043E\u043C'
+    }
+};
+
+/* Map WMO weather code → pseudo-OWM id for particle/color/emoji compatibility */
+function wmoToOwmId(code) {
+    if (code <= 1) return 800;                // clear
+    if (code === 2) return 801;               // partly cloudy
+    if (code === 3) return 802;               // overcast
+    if (code === 45 || code === 48) return 701; // fog
+    if (code >= 51 && code <= 57) return 301; // drizzle
+    if (code >= 61 && code <= 65) return code >= 65 ? 502 : 501; // rain
+    if (code === 66 || code === 67) return 511; // freezing rain
+    if (code >= 71 && code <= 77) return code >= 75 ? 602 : 601; // snow
+    if (code >= 80 && code <= 82) return code === 82 ? 502 : 501; // rain showers
+    if (code >= 85 && code <= 86) return code === 86 ? 602 : 601; // snow showers
+    if (code >= 95 && code <= 99) return code === 95 ? 201 : 202; // thunderstorm
+    return 800;
+}
+
+/* Parse "2026-06-07T12:00" as local-time Date */
+function _parseLocalDate(str) {
+    let parts = str.split('T');
+    let dateParts = parts[0].split('-');
+    let timeParts = parts[1].split(':');
+    return new Date(
+        parseInt(dateParts[0], 10),
+        parseInt(dateParts[1], 10) - 1,
+        parseInt(dateParts[2], 10),
+        parseInt(timeParts[0], 10),
+        parseInt(timeParts[1], 10)
+    );
+}
+
+/* Get minutes-since-midnight from an ISO local time string */
+function _getMinutes(str) {
+    let timePart = str.split('T')[1]; // "HH:MM"
+    let parts = timePart.split(':');
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+}
 
 function Particle(x, y, type) {
     this.x = x;
@@ -154,6 +252,8 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this._time = 0;
         this._error = null;
         this._loading = true;
+        this._sunriseMinutes = null;
+        this._sunsetMinutes = null;
 
         this._httpSession = null;
         try {
@@ -164,7 +264,6 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         }
 
         this.settings = new Settings.DeskletSettings(this, this._uuid, desklet_id);
-        this.settings.bindProperty(Settings.BindingDirection.IN, 'api-key', 'apiKey', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'location', 'location', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'units', 'units', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'refresh-interval', 'refreshInterval', this._onSettingsChanged.bind(this));
@@ -203,6 +302,16 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
     }
 
     _onSettingsChanged() {
+        // Normalise combobox values: Cinnamon may store the display label
+        // instead of the option key (e.g. "Celsius °C" vs "metric").
+        if (this.units === 'Celsius °C' || this.units === '°C') this.units = 'metric';
+        if (this.units === 'Fahrenheit °F' || this.units === '°F') this.units = 'imperial';
+        if (this.theme === 'Auto (adapts to weather/sky)') this.theme = 'auto';
+        if (this.theme === 'Glass (frosted, always light)') this.theme = 'glass';
+        if (this.theme === 'Dark (night mode)') this.theme = 'dark';
+        if (this.language === 'English') this.language = 'en';
+        if (this.language === 'Русский') this.language = 'ru';
+
         if (this._width !== this.width) {
             this._width = Math.max(200, Math.min(600, this.width));
             if (this._drawArea) this._drawArea.set_size(this._width, this._height);
@@ -663,15 +772,6 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
             cr.showText(line);
             ly += 22;
         }
-
-        cr.setFontSize(11);
-        cr.setSourceRGBA(textColor[0], textColor[1], textColor[2], 0.5);
-        let tip = this._('check_key_long');
-        if (this._textWidth(cr, tip) > w - 60) {
-            tip = this._('check_key_short');
-        }
-        cr.moveTo(w / 2 - this._textWidth(cr, tip) / 2, ly + 15);
-        cr.showText(tip);
     }
 
     _textWidth(cr, text) {
@@ -727,10 +827,16 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         return '🌤️';
     }
 
+    /* Night detection via sunrise/sunset minutes (from Open-Meteo daily data) */
     _isNight() {
-        if (!this._weather || !this._weather.weather || !this._weather.weather[0]) return false;
-        let icon = this._weather.weather[0].icon;
-        return icon && icon.endsWith('n');
+        if (this._sunriseMinutes === null || this._sunsetMinutes === null) {
+            // fallback: 21:00–06:00
+            let h = new Date().getHours();
+            return h < 6 || h >= 21;
+        }
+        let now = new Date();
+        let curMin = now.getHours() * 60 + now.getMinutes();
+        return curMin < this._sunriseMinutes || curMin > this._sunsetMinutes;
     }
 
     _bytesToString(data) {
@@ -784,8 +890,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
             return;
         }
 
-        // libsoup3 path. The previous code used send_async() with incorrect
-        // argument order, which made GJS treat callback as a GCancellable.
+        // libsoup3: send_and_read_async
         if (typeof session.send_and_read_async === 'function') {
             session.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null, Lang.bind(this, function(sess, result) {
                 try {
@@ -824,109 +929,240 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         if (onError) onError(this._('no_soup'));
     }
 
+    /* Build Open-Meteo forecast URL and fetch weather + hourly forecast in one call */
     _refreshWeather() {
-        let key = this.apiKey;
-        if (!key || key === '') {
-            this._error = { key: 'no_api_key' };
-            this._loading = false;
-            if (this._drawArea) this._drawArea.queue_repaint();
-            return;
-        }
-
         this._loading = true;
         this._error = null;
         if (this._drawArea) this._drawArea.queue_repaint();
-        this._resolveLocation(key);
+        this._resolveLocation();
     }
 
-    _resolveLocation(key) {
+    /* Resolve location: geocode city name via Open-Meteo, or auto via ip-api.com */
+    _resolveLocation() {
         let loc = this.location || 'auto';
 
         if (loc && loc !== 'auto') {
-            let url = 'https://api.openweathermap.org/data/2.5/weather?q='
+            let url = 'https://geocoding-api.open-meteo.com/v1/search?name='
                 + GLib.uri_escape_string(loc, null, true)
-                + '&appid=' + key + '&units=' + (this.units || 'metric');
-            this._fetchWeather(url, key);
-        } else {
-            let geoUrl = 'http://ip-api.com/json/?fields=city,countryCode&lang=en';
-            this._httpGet(
-                geoUrl,
-                Lang.bind(this, function(data) {
-                    try {
-                        let json = JSON.parse(data);
-                        let city = json.city || '';
-                        let country = json.countryCode || '';
-                        if (city) {
-                            let locStr = city + (country ? ',' + country : '');
-                            let url = 'https://api.openweathermap.org/data/2.5/weather?q='
-                                + GLib.uri_escape_string(locStr, null, true)
-                                + '&appid=' + key + '&units=' + (this.units || 'metric');
-                            this._fetchWeather(url, key);
-                            return;
-                        }
-                    } catch (e) {}
+                + '&count=1&language='
+                + (this.language === 'ru' ? 'ru' : 'en')
+                + '&format=json';
 
-                    let url = 'https://api.openweathermap.org/data/2.5/weather?q=Moscow&appid='
-                        + key + '&units=' + (this.units || 'metric');
-                    this._fetchWeather(url, key);
-                }),
-                Lang.bind(this, function() {
-                    let url = 'https://api.openweathermap.org/data/2.5/weather?q=Moscow&appid='
-                        + key + '&units=' + (this.units || 'metric');
-                    this._fetchWeather(url, key);
-                })
-            );
+            this._httpGet(url, Lang.bind(this, function(data) {
+                try {
+                    let json = JSON.parse(data);
+                    if (json.results && json.results.length > 0) {
+                        let r = json.results[0];
+                        let city = r.name || loc;
+                        let country = r.country_code || '';
+                        this._fetchWeather(r.latitude, r.longitude, city, country);
+                        return;
+                    }
+                } catch (e) {}
+                // fallback: try as lat,lon pair
+                let parts = loc.split(',');
+                if (parts.length === 2) {
+                    let lat = parseFloat(parts[0]);
+                    let lon = parseFloat(parts[1]);
+                    if (!isNaN(lat) && !isNaN(lon)) {
+                        this._fetchWeather(lat, lon, loc, '');
+                        return;
+                    }
+                }
+                this._error = { key: 'resolve_err', detail: loc };
+                this._loading = false;
+                if (this._drawArea) this._drawArea.queue_repaint();
+            }), Lang.bind(this, function(err) {
+                this._error = { key: 'resolve_err', detail: err };
+                this._loading = false;
+                if (this._drawArea) this._drawArea.queue_repaint();
+            }));
+        } else {
+            // Auto-detect via ip-api.com (no key needed)
+            let geoUrl = 'http://ip-api.com/json/?fields=city,countryCode,lat,lon&lang=en';
+            this._httpGet(geoUrl, Lang.bind(this, function(data) {
+                try {
+                    let json = JSON.parse(data);
+                    let city = json.city || '';
+                    let country = json.countryCode || '';
+                    let lat = json.lat;
+                    let lon = json.lon;
+                    if (city && lat !== undefined && lon !== undefined) {
+                        this._fetchWeather(lat, lon, city, country);
+                        return;
+                    }
+                } catch (e) {}
+                // fallback Moscow
+                this._fetchWeather(55.75, 37.62, 'Moscow', 'RU');
+            }), Lang.bind(this, function() {
+                this._fetchWeather(55.75, 37.62, 'Moscow', 'RU');
+            }));
         }
     }
 
-    _fetchWeather(url, key) {
-        this._httpGet(
-            url,
-            Lang.bind(this, function(data) {
-                try {
-                    this._weather = JSON.parse(data);
-                    if (this._weather && this._weather.cod && parseInt(this._weather.cod, 10) !== 200) {
-                        let message = this._weather.message || 'unknown error';
-                        this._error = { key: 'api_err', detail: message };
-                        this._loading = false;
-                        this._drawArea.queue_repaint();
-                        return;
-                    }
-                    this._loading = false;
-                    this._error = null;
-                    this._initParticles();
-                    this._fetchForecast(key);
-                    this._drawArea.queue_repaint();
-                } catch (e) {
-                    this._error = { key: 'parse_err', detail: e.toString().slice(0, 60) };
-                    this._loading = false;
-                    this._drawArea.queue_repaint();
-                }
-            }),
-            Lang.bind(this, function(err) {
-                this._error = { key: 'api_err', detail: err };
-                this._loading = false;
-                this._drawArea.queue_repaint();
-            })
-        );
-    }
+    /* Fetch weather + hourly forecast from Open-Meteo in one call */
+    _fetchWeather(lat, lon, name, country) {
+        let tempUnit = this.units === 'metric' ? 'celsius' : 'fahrenheit';
+        let windUnit = this.units === 'metric' ? 'kmh' : 'mph';
 
-    _fetchForecast(key) {
-        if (!this._weather) return;
-        let lat = this._weather.coord.lat;
-        let lon = this._weather.coord.lon;
-        let url = 'https://api.openweathermap.org/data/2.5/forecast?lat='
-            + lat + '&lon=' + lon + '&appid=' + key
-            + '&units=' + (this.units || 'metric') + '&cnt=8';
+        let url = 'https://api.open-meteo.com/v1/forecast'
+            + '?latitude=' + lat + '&longitude=' + lon
+            + '&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,surface_pressure'
+            + '&hourly=temperature_2m,weather_code'
+            + '&daily=sunrise,sunset'
+            + '&timezone=auto'
+            + '&forecast_days=2'
+            + '&temperature_unit=' + tempUnit
+            + '&wind_speed_unit=' + windUnit;
 
         this._httpGet(url, Lang.bind(this, function(data) {
             try {
-                this._forecast = JSON.parse(data);
+                let json = JSON.parse(data);
+
+                // Open-Meteo error response
+                if (json.error) {
+                    this._error = { key: 'api_err', detail: json.reason || 'unknown' };
+                    this._loading = false;
+                    if (this._drawArea) this._drawArea.queue_repaint();
+                    return;
+                }
+
+                let current = json.current;
+                let hourly = json.hourly;
+                let daily = json.daily;
+
+                // Store sunrise/sunset for night detection
+                this._sunriseMinutes = null;
+                this._sunsetMinutes = null;
+                if (daily && daily.sunrise && daily.sunrise.length > 0) {
+                    this._sunriseMinutes = _getMinutes(daily.sunrise[0]);
+                    this._sunsetMinutes = _getMinutes(daily.sunset[0]);
+                }
+
+                // Map Open-Meteo current → OWM-like structure
+                let wmoCode = current.weather_code;
+                let owmId = wmoToOwmId(wmoCode);
+                let isNight = this._isNight();
+
+                // Build icon name (OWM-style: "01d" / "01n" etc.)
+                let iconNum = '01';
+                if (owmId >= 200 && owmId < 300) iconNum = '11';
+                else if (owmId >= 300 && owmId < 400) iconNum = '09';
+                else if (owmId >= 500 && owmId < 600) iconNum = '10';
+                else if (owmId >= 600 && owmId < 700) iconNum = '13';
+                else if (owmId >= 700 && owmId < 800) iconNum = '50';
+                else if (owmId === 800) iconNum = '01';
+                else if (owmId === 801) iconNum = '02';
+                else if (owmId === 802) iconNum = '03';
+                else if (owmId >= 803) iconNum = '04';
+
+                let icon = iconNum + (isNight ? 'n' : 'd');
+
+                // Look up description
+                let lang = this.language || 'en';
+                let desc = (WMO_DESCRIPTIONS[lang] && WMO_DESCRIPTIONS[lang][wmoCode])
+                    || WMO_DESCRIPTIONS.en[wmoCode] || 'clear sky';
+
+                this._weather = {
+                    name: name || '',
+                    sys: { country: country || '' },
+                    main: {
+                        temp: current.temperature_2m,
+                        feels_like: current.apparent_temperature,
+                        humidity: current.relative_humidity_2m,
+                        pressure: Math.round(current.surface_pressure)
+                    },
+                    wind: {
+                        speed: current.wind_speed_10m
+                    },
+                    weather: [{
+                        id: owmId,
+                        main: desc,
+                        description: desc,
+                        icon: icon
+                    }]
+                };
+
+                // Build forecast from hourly data
+                this._buildForecastFromHourly(hourly, daily);
+
+                this._loading = false;
+                this._error = null;
+                this._initParticles();
+                if (this._drawArea) this._drawArea.queue_repaint();
+
             } catch (e) {
-                this._forecast = null;
+                this._error = { key: 'parse_err', detail: e.toString().slice(0, 60) };
+                this._loading = false;
+                if (this._drawArea) this._drawArea.queue_repaint();
             }
-            this._drawArea.queue_repaint();
+        }), Lang.bind(this, function(err) {
+            this._error = { key: 'api_err', detail: err };
+            this._loading = false;
+            if (this._drawArea) this._drawArea.queue_repaint();
         }));
+    }
+
+    /* Build forecast list from Open-Meteo hourly arrays */
+    _buildForecastFromHourly(hourly, daily) {
+        if (!hourly || !hourly.time || !hourly.temperature_2m || !hourly.weather_code) {
+            this._forecast = null;
+            return;
+        }
+
+        // Parse sunrise/sunset minutes for night detection per slot
+        let sr = null, ss = null;
+        if (daily && daily.sunrise && daily.sunrise.length > 0) {
+            sr = _getMinutes(daily.sunrise[0]);
+            ss = _getMinutes(daily.sunset[0]);
+        }
+
+        let now = new Date();
+        let currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        let list = [];
+        for (let i = 0; i < hourly.time.length && list.length < 8; i++) {
+            let slotMinutes = _getMinutes(hourly.time[i]);
+            let slotDate = _parseLocalDate(hourly.time[i]);
+
+            // Skip past slots (compare full date)
+            if (slotDate <= now) continue;
+
+            // Determine if this slot is at night
+            let slotIsNight = false;
+            if (sr !== null && ss !== null) {
+                slotIsNight = slotMinutes < sr || slotMinutes > ss;
+            } else {
+                // fallback 21:00–06:00
+                let h = slotDate.getHours();
+                slotIsNight = h < 6 || h >= 21;
+            }
+
+            let wmoCode = hourly.weather_code[i];
+            let owmId = wmoToOwmId(wmoCode);
+
+            // Build icon
+            let iconNum = '01';
+            if (owmId >= 200 && owmId < 300) iconNum = '11';
+            else if (owmId >= 300 && owmId < 400) iconNum = '09';
+            else if (owmId >= 500 && owmId < 600) iconNum = '10';
+            else if (owmId >= 600 && owmId < 700) iconNum = '13';
+            else if (owmId >= 700 && owmId < 800) iconNum = '50';
+            else if (owmId === 800) iconNum = '01';
+            else if (owmId === 801) iconNum = '02';
+            else if (owmId === 802) iconNum = '03';
+            else if (owmId >= 803) iconNum = '04';
+
+            let icon = iconNum + (slotIsNight ? 'n' : 'd');
+
+            list.push({
+                dt: Math.floor(slotDate.getTime() / 1000),
+                main: { temp: hourly.temperature_2m[i] },
+                weather: [{ icon: icon, id: owmId }]
+            });
+        }
+
+        this._forecast = list.length > 0 ? { list: list } : null;
     }
 
     _startAnimation() {

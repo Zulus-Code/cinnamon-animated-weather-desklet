@@ -26,14 +26,6 @@ msgstr ""
 msgid "Real-time animated weather desklet with live particle effects — rain, snow, clouds, stars, and dynamic sky gradients"
 msgstr ""
 
-#. settings-schema.json->api-key->description
-msgid "OpenWeatherMap API Key"
-msgstr ""
-
-#. settings-schema.json->api-key->tooltip
-msgid "Get your free key at https://openweathermap.org/api (free tier: 60 calls/min)"
-msgstr ""
-
 #. settings-schema.json->location->description
 msgid "City name or 'auto' for IP geolocation"
 msgstr ""
