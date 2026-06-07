@@ -1,0 +1,744 @@
+/* sceneBuilder.js — Procedural scene generation & Perlin noise for weather-animated@zulus
+ *
+ * Converts weather data from weatherService into visual scene parameters.
+ * Provides pre-generated fBm noise textures for use by the renderer.
+ */
+
+const Cairo = imports.cairo;
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  2D Perlin Noise (standard implementation)
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+function PerlinNoise(seed) {
+    this._seed = seed || 42;
+    this._perm = new Array(512);
+    this._grad = [[1,1],[-1,1],[1,-1],[-1,-1],
+                  [1,0],[-1,0],[0,1],[0,-1]];
+
+    // Fisher-Yates shuffle the permutation table
+    let p = new Array(256);
+    for (let i = 0; i < 256; i++) p[i] = i;
+    let s = this._seed;
+    for (let i = 255; i > 0; i--) {
+        s = (s * 16807) % 2147483647;
+        let j = s % (i + 1);
+        let tmp = p[i]; p[i] = p[j]; p[j] = tmp;
+    }
+    for (let i = 0; i < 512; i++) this._perm[i] = p[i & 255];
+}
+
+PerlinNoise.prototype._fade = function (t) {
+    return t * t * t * (t * (t * 6 - 15) + 10);
+};
+
+PerlinNoise.prototype._lerp = function (a, b, t) {
+    return a + t * (b - a);
+};
+
+PerlinNoise.prototype._dot = function (g, x, y) {
+    return g[0] * x + g[1] * y;
+};
+
+PerlinNoise.prototype.noise = function (x, y) {
+    let X = Math.floor(x) & 255;
+    let Y = Math.floor(y) & 255;
+    let xf = x - Math.floor(x);
+    let yf = y - Math.floor(y);
+    let u = this._fade(xf);
+    let v = this._fade(yf);
+
+    let aa = this._perm[this._perm[X] + Y];
+    let ab = this._perm[this._perm[X] + Y + 1];
+    let ba = this._perm[this._perm[X + 1] + Y];
+    let bb = this._perm[this._perm[X + 1] + Y + 1];
+
+    let x1 = this._lerp(
+        this._dot(this._grad[aa & 7], xf, yf),
+        this._dot(this._grad[ba & 7], xf - 1, yf),
+        u);
+    let x2 = this._lerp(
+        this._dot(this._grad[ab & 7], xf, yf - 1),
+        this._dot(this._grad[bb & 7], xf - 1, yf - 1),
+        u);
+    return this._lerp(x1, x2, v);
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  fBm — Fractal Brownian Motion
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+function fBm(noise, x, y, octaves, lacunarity, gain) {
+    let value = 0, amplitude = 1, frequency = 1, maxVal = 0;
+    for (let i = 0; i < octaves; i++) {
+        value += amplitude * noise.noise(x * frequency, y * frequency);
+        maxVal += amplitude;
+        amplitude *= gain;
+        frequency *= lacunarity;
+    }
+    return value / maxVal;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  NoiseTexture — pre-generated fBm noise stored as a Cairo ImageSurface
+ *                 and a flat Float64Array for fast point sampling
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+const NOISE_SIZE = 256;
+
+function NoiseTexture() {
+    this._size = NOISE_SIZE;
+    this._noise = new PerlinNoise(42);
+    this._data = new Float64Array(NOISE_SIZE * NOISE_SIZE);
+    this._surface = null;
+    this._generate();
+}
+
+NoiseTexture.prototype._generate = function () {
+    let size = this._size;
+    let half = size / 2;
+
+    // Generate fBm noise values into the flat array
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            // Use fBm with 4 octaves for rich detail
+            let nx = (x - half) / size * 4;
+            let ny = (y - half) / size * 4;
+            let val = fBm(this._noise, nx, ny, 4, 2.5, 0.55);
+            this._data[y * size + x] = val;
+        }
+    }
+
+    // Create Cairo ImageSurface (ARGB32) from the data for pattern use
+    try {
+        this._surface = new Cairo.ImageSurface(Cairo.Format.ARGB32, size, size);
+        let cr = new Cairo.Context(this._surface);
+
+        // Draw in blocks for efficiency (8x8 blocks)
+        let block = 8;
+        for (let by = 0; by < size; by += block) {
+            for (let bx = 0; bx < size; bx += block) {
+                // Average block value
+                let sum = 0;
+                for (let dy = 0; dy < block && by + dy < size; dy++) {
+                    for (let dx = 0; dx < block && bx + dx < size; dx++) {
+                        sum += this._data[(by + dy) * size + (bx + dx)];
+                    }
+                }
+                let avg = (sum / (block * block) + 1) * 0.5; // [0, 1]
+                let v = Math.max(0, Math.min(255, Math.floor(avg * 255)));
+                cr.setSourceRGBA(v / 255, v / 255, v / 255, 1);
+                cr.rectangle(bx, by, block, block);
+                cr.fill();
+            }
+        }
+    } catch (e) {
+        // Surface creation failed — renderer will use array directly
+        this._surface = null;
+    }
+};
+
+// Bilinear interpolation sampling of the noise texture
+NoiseTexture.prototype.sample = function (x, y) {
+    let size = this._size;
+    // Wrap coordinates
+    x = ((x % size) + size) % size;
+    y = ((y % size) + size) % size;
+
+    let ix = Math.floor(x);
+    let iy = Math.floor(y);
+    let fx = x - ix;
+    let fy = y - iy;
+    let ix2 = (ix + 1) % size;
+    let iy2 = (iy + 1) % size;
+
+    let v00 = this._data[iy * size + ix];
+    let v10 = this._data[iy * size + ix2];
+    let v01 = this._data[iy2 * size + ix];
+    let v11 = this._data[iy2 * size + ix2];
+
+    let v0 = v00 + (v10 - v00) * fx;
+    let v1 = v01 + (v11 - v01) * fx;
+    return v0 + (v1 - v0) * fy;
+};
+
+// Create a Cairo pattern from the noise texture for cloud rendering
+NoiseTexture.prototype.getSurface = function () {
+    return this._surface;
+};
+
+// Sample fBm with wrapping, optionally at a different frequency
+NoiseTexture.prototype.fBmSample = function (x, y, octaves) {
+    octaves = octaves || 3;
+    let value = 0, amplitude = 1, frequency = 1, maxVal = 0;
+    let lacunarity = 2.3, gain = 0.55;
+    for (let i = 0; i < octaves; i++) {
+        value += amplitude * this.sample(x * frequency, y * frequency);
+        maxVal += amplitude;
+        amplitude *= gain;
+        frequency *= lacunarity;
+    }
+    return value / maxVal;
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  SceneBuilder — transforms weather data → visual scene parameters
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+function SceneBuilder() {
+    this._noiseTex = new NoiseTexture();
+
+    // Current (interpolated) and target scene states
+    this._current = this._defaultScene();
+    this._target = this._defaultScene();
+
+    // Per-second transition speed (higher = faster, 1.2 ≈ 2.5s to 95%)
+    this._transitionSpeed = 1.2;
+
+    // Elapsed animation time
+    this._time = 0;
+
+    // Last known weather values for smooth interpolation on update
+    this._lastWeatherCode = null;
+    this._lastSunrise = null;
+    this._lastSunset = null;
+
+    // Cloud animation offsets
+    this._cloudOffsets = [0, 0, 0];
+}
+
+SceneBuilder.prototype._defaultScene = function () {
+    return {
+        // Time
+        timeOfDay: 0.5,           // 0 = midnight, 0.5 = noon
+        sunElevation: 60,         // degrees above horizon
+        sunAzimuth: 180,          // degrees
+        isNight: false,
+        twilight: 0,              // 0=night, 1=day, twilight=0.2-0.5
+
+        // Moon
+        moonPhase: 0,
+        moonIllumination: 0,
+        moonVisible: false,
+        moonElevation: 0,
+
+        // Clouds (3 layers: far, mid, near)
+        cloudCover: 0,
+        cloudOpacity: [0, 0, 0],
+        cloudSpeed: [0.2, 0.5, 0.8],
+        cloudScale: [0.02, 0.01, 0.005],
+        cloudDensity: [0.3, 0.5, 0.7],
+
+        // Precipitation
+        precipitation: 0,         // 0-1 intensity
+        precipitationType: 'none', // 'none', 'rain', 'snow', 'drizzle', 'thunder'
+
+        // Atmosphere
+        fogIntensity: 0,          // 0-1
+        fogDensity: 0.3,
+        windSpeed: 0,             // km/h
+
+        // Sky colors
+        skyTopColor:    [0.25, 0.50, 0.90],
+        skyMidColor:    [0.45, 0.70, 0.95],
+        skyBottomColor: [0.65, 0.85, 1.00],
+        sunColor:       [1.00, 0.90, 0.60],
+        sunGlowColor:   [1.00, 0.85, 0.40],
+        horizonGlow:    [0.80, 0.90, 1.00],
+
+        // Panel tint
+        panelTint: [1, 1, 1],
+
+        // Ambient light for particles
+        ambientLight: [1, 1, 1]
+    };
+};
+
+SceneBuilder.prototype.getNoiseTex = function () {
+    return this._noiseTex;
+};
+
+/* ── Main entry point: build scene from weather data ───────────────────── */
+SceneBuilder.prototype.buildScene = function (weatherData, sunriseMinutes,
+                                              sunsetMinutes, language) {
+    this._updateSceneTarget(weatherData, sunriseMinutes, sunsetMinutes, language);
+    return this._current;
+};
+
+/* ── Update target scene parameters from weather data ──────────────────── */
+SceneBuilder.prototype._updateSceneTarget = function (weatherData,
+                                                       sunriseMinutes,
+                                                       sunsetMinutes,
+                                                       language) {
+    let t = this._target;
+    let w = weatherData;
+    let wmoCode = w.wmoCode !== undefined ? w.wmoCode :
+                  (w.weather ? this._wmoFromOwmid(w.weather[0].id) : 0);
+    let isNight;
+    let sunElevation;
+
+    // ── Time of day / sun position ──
+    let [sunEl, twilight, night, moonEl, moonVis, moonIllum] =
+        this._calcSunMoon(sunriseMinutes, sunsetMinutes);
+
+    isNight = night;
+    t.sunElevation = sunEl;
+    t.isNight = isNight;
+    t.twilight = twilight;
+    t.moonElevation = moonEl;
+    t.moonVisible = moonVis;
+    t.moonIllumination = moonIllum;
+
+    // Time of day as continuous 0-1 value (0=midnight)
+    let now = new Date();
+    let curMin = now.getHours() * 60 + now.getMinutes();
+    t.timeOfDay = curMin / 1440;
+
+    // ── Cloud cover from WMO code ──
+    let cloudCover, fogIntensity, precip, precipType;
+
+    if (wmoCode <= 1) {            // Clear
+        cloudCover = 0;
+        fogIntensity = 0;
+        precip = 0;
+        precipType = 'none';
+    } else if (wmoCode === 2) {    // Partly cloudy
+        cloudCover = 0.35;
+        fogIntensity = 0;
+        precip = 0;
+        precipType = 'none';
+    } else if (wmoCode === 3) {    // Overcast
+        cloudCover = 0.90;
+        fogIntensity = 0;
+        precip = 0;
+        precipType = 'none';
+    } else if (wmoCode === 45 || wmoCode === 48) {  // Fog
+        cloudCover = 0.30;
+        fogIntensity = 0.85;
+        precip = 0;
+        precipType = 'none';
+    } else if (wmoCode >= 51 && wmoCode <= 57) {    // Drizzle
+        cloudCover = 0.70;
+        fogIntensity = 0.15;
+        precip = 0.25;
+        precipType = 'drizzle';
+    } else if (wmoCode >= 61 && wmoCode <= 67) {    // Rain
+        cloudCover = 0.80;
+        fogIntensity = 0.05;
+        precip = Math.min(0.9, 0.3 + (wmoCode - 61) * 0.15);
+        precipType = 'rain';
+    } else if (wmoCode >= 71 && wmoCode <= 77) {    // Snow
+        cloudCover = 0.85;
+        fogIntensity = 0.10;
+        precip = Math.min(0.85, 0.25 + (wmoCode - 71) * 0.12);
+        precipType = 'snow';
+    } else if (wmoCode >= 80 && wmoCode <= 82) {    // Rain showers
+        cloudCover = 0.65 + (wmoCode - 80) * 0.10;
+        fogIntensity = 0;
+        precip = 0.35 + (wmoCode - 80) * 0.15;
+        precipType = 'rain';
+    } else if (wmoCode >= 85 && wmoCode <= 86) {    // Snow showers
+        cloudCover = 0.70;
+        fogIntensity = 0;
+        precip = 0.35 + (wmoCode - 85) * 0.15;
+        precipType = 'snow';
+    } else if (wmoCode >= 95 && wmoCode <= 99) {    // Thunderstorm
+        cloudCover = 0.95;
+        fogIntensity = 0;
+        precip = 0.80;
+        precipType = 'thunder';
+    } else {
+        cloudCover = 0;
+        fogIntensity = 0;
+        precip = 0;
+        precipType = 'none';
+    }
+
+    t.cloudCover = cloudCover;
+    t.fogIntensity = fogIntensity;
+    t.precipitation = precip;
+    t.precipitationType = precipType;
+
+    // ── Wind speed ──
+    t.windSpeed = w.wind ? w.wind.speed : 0;
+
+    // ── Temperature ──
+    t.temperature = w.main ? w.main.temp : 20;
+
+    // ── Cloud layer properties (based on cover + time of day) ──
+    let base = cloudCover;
+    // Far clouds (thin, high): always some presence
+    t.cloudOpacity[0] = Math.min(1, 0.15 + base * 0.6);
+    // Mid clouds: main cloud layer
+    t.cloudOpacity[1] = Math.min(1, 0.1 + base * 0.8);
+    // Near clouds (thick, low): only when very cloudy
+    t.cloudOpacity[2] = Math.min(1, Math.max(0, base * 1.2 - 0.3));
+
+    // Scale: far=large, near=small (parallax)
+    t.cloudScale[0] = 0.025;
+    t.cloudScale[1] = 0.012;
+    t.cloudScale[2] = 0.006;
+
+    // Speed: far=slow, near=fast (parallax)
+    let windFactor = 0.1 + Math.min(1, (t.windSpeed || 5) / 60);
+    t.cloudSpeed[0] = windFactor * 0.15;
+    t.cloudSpeed[1] = windFactor * 0.35;
+    t.cloudSpeed[2] = windFactor * 0.70;
+
+    // Density: far=diffuse, near=opaque
+    t.cloudDensity[0] = 0.3 + base * 0.4;
+    t.cloudDensity[1] = 0.4 + base * 0.5;
+    t.cloudDensity[2] = 0.5 + base * 0.4;
+
+    // ── Sky colors ──
+    this._calcSkyColors(t, sunEl, twilight, cloudCover, precipType);
+
+    // ── Panel tint ──
+    this._calcPanelTint(t);
+
+    // ── Ambient light ──
+    this._calcAmbientLight(t);
+};
+
+/* ── Calculate sun/moon position ────────────────────────────────────────── */
+SceneBuilder.prototype._calcSunMoon = function (sunriseMinutes, sunsetMinutes) {
+    let now = new Date();
+    let curMin = now.getHours() * 60 + now.getMinutes();
+
+    let sr = sunriseMinutes !== null ? sunriseMinutes : 360;   // 06:00
+    let ss = sunsetMinutes !== null ? sunsetMinutes : 1080;    // 18:00
+
+    // Day progress (0 at sunrise, 1 at sunset)
+    let dayLength = ss - sr;
+    let dayProgress = dayLength > 0 ? (curMin - sr) / dayLength : 0.5;
+
+    let isNight = (curMin < sr || curMin > ss);
+    let sunElevation, twilight;
+
+    if (!isNight) {
+        // During day: sin curve from sunrise to sunset
+        sunElevation = Math.sin(dayProgress * Math.PI) * 90;
+        // Twilight: near sunrise/sunset (within 30 minutes)
+        let minsFromEdge = Math.min(
+            Math.abs(curMin - sr),
+            Math.abs(curMin - ss)
+        );
+        twilight = Math.min(1, Math.max(0, minsFromEdge / 45));
+        twilight = 1 - twilight; // 0=fully day, 1=fully twilight
+    } else {
+        sunElevation = -10;
+        // Night: how far into night
+        let minutesSinceSunset = curMin - ss;
+        let minutesUntilSunrise = 1440 - curMin + sr;
+        let nightMinutes = Math.min(minutesSinceSunset, minutesUntilSunrise);
+        twilight = 1 + Math.min(0, Math.max(-0.5, -(nightMinutes / 60)));
+        if (twilight < 0.3) {
+            // True night (not twilight)
+            twilight = -0.1;
+        } else {
+            twilight = Math.max(0.3, twilight);
+        }
+    }
+
+    // Clamp twilight to [-0.1, 1]
+    twilight = Math.max(-0.1, Math.min(1, twilight));
+
+    // Moon: visible at night, calculate approximate elevation
+    let moonVisible = isNight || twilight > 0.5;
+    // Simple moon elevation: high at midnight, low near horizon
+    let moonEl = moonVisible ? 60 : -20;
+    if (isNight) {
+        let nightProgress = (curMin - ss) / (1440 - ss + sr);
+        moonEl = Math.sin(nightProgress * Math.PI) * 70;
+    }
+    // Moon illumination: near full ≈ 1, near new ≈ 0
+    // Approximate from day of month (very rough)
+    let dayOfMonth = now.getDate();
+    let moonIllum = 0.5 + 0.5 * Math.sin((dayOfMonth - 6) / 15 * Math.PI);
+    let moonPhase = (dayOfMonth % 30) / 30;
+
+    return [sunElevation, twilight, isNight, moonEl, moonVisible, moonIllum];
+};
+
+/* ── Calculate sky gradient colors ─────────────────────────────────────── */
+SceneBuilder.prototype._calcSkyColors = function (t, sunEl, twilight,
+                                                   cloudCover, precipType) {
+    let night = t.isNight;
+    let dayFactor = sunEl > 5 ? Math.min(1, sunEl / 60) : 0;
+    let twilightFactor = Math.max(0, Math.min(1, twilight));
+
+    // Base sky colors for different conditions
+    let topDay = [0.25, 0.50, 0.90];
+    let midDay = [0.45, 0.70, 0.95];
+    let botDay = [0.65, 0.85, 1.00];
+
+    let topNight = [0.02, 0.02, 0.10];
+    let midNight = [0.04, 0.04, 0.15];
+    let botNight = [0.06, 0.06, 0.20];
+
+    let topTwilight = [0.15, 0.08, 0.20];
+    let midTwilight = [0.50, 0.20, 0.15];
+    let botTwilight = [0.90, 0.50, 0.20];
+
+    // Sunset warm tones (when sun is low)
+    let sunsetFactor = 0;
+    if (sunEl > 0 && sunEl < 20) {
+        sunsetFactor = 1 - (sunEl / 20);
+    }
+
+    // Cloudy/rainy adjustments
+    let overcast = Math.min(1, cloudCover * 1.2);
+    let isRainy = (precipType === 'rain' || precipType === 'drizzle' ||
+                   precipType === 'thunder');
+    let isSnowy = (precipType === 'snow');
+
+    // Night sky
+    if (night || sunEl < -2) {
+        let nf = night ? 1 : (1 - Math.min(1, (sunEl + 5) / 5));
+
+        // Clear night
+        let top = _lerpArr(topNight, topTwilight, twilightFactor);
+        let mid = _lerpArr(midNight, midTwilight, twilightFactor);
+        let bot = _lerpArr(botNight, botTwilight, twilightFactor);
+
+        // Overcast modifies night colors
+        if (overcast > 0.3) {
+            let oc = Math.min(1, (overcast - 0.3) / 0.7);
+            let greyTop = [0.08, 0.08, 0.12];
+            let greyBot = [0.12, 0.12, 0.18];
+            top = _lerpArr(top, greyTop, oc);
+            mid = _lerpArr(mid, greyTop, oc);
+            bot = _lerpArr(bot, greyBot, oc);
+        }
+
+        // Snow at night is brighter
+        if (isSnowy) {
+            let bright = [0.15, 0.15, 0.22];
+            top = _lerpArr(top, bright, 0.4);
+            mid = _lerpArr(mid, bright, 0.4);
+            bot = _lerpArr(bot, bright, 0.3);
+        }
+
+        t.skyTopColor = top;
+        t.skyMidColor = mid;
+        t.skyBottomColor = bot;
+        t.sunColor = [0.8, 0.85, 1.0];
+        t.sunGlowColor = [0.3, 0.4, 0.8];
+        t.horizonGlow = sunsetFactor > 0.5 ? [0.4, 0.2, 0.1] : [0.05, 0.05, 0.15];
+        return;
+    }
+
+    // ── Daytime ──
+
+    // Start with clear sky
+    let top = topDay.slice();
+    let mid = midDay.slice();
+    let bot = botDay.slice();
+
+    // Apply twilight
+    if (twilightFactor > 0.1) {
+        top = _lerpArr(top, topTwilight, twilightFactor * 0.7);
+        mid = _lerpArr(mid, midTwilight, twilightFactor * 0.8);
+        bot = _lerpArr(bot, botTwilight, twilightFactor);
+    }
+
+    // Apply sunset coloration
+    if (sunsetFactor > 0.05 && !night) {
+        let warmTop = [0.30, 0.15, 0.25];
+        let warmMid = [0.70, 0.30, 0.15];
+        let warmBot = [1.00, 0.65, 0.30];
+
+        top = _lerpArr(top, warmTop, sunsetFactor * 0.6);
+        mid = _lerpArr(mid, warmMid, sunsetFactor * 0.8);
+        bot = _lerpArr(bot, warmBot, sunsetFactor);
+    }
+
+    // Apply cloud cover
+    if (overcast > 0.2) {
+        let oc = (overcast - 0.2) / 0.8;
+        let greyTop, greyMid, greyBot;
+
+        if (isRainy) {
+            greyTop = [0.30, 0.35, 0.45];
+            greyMid = [0.35, 0.40, 0.50];
+            greyBot = [0.40, 0.48, 0.55];
+        } else if (isSnowy) {
+            greyTop = [0.50, 0.55, 0.65];
+            greyMid = [0.55, 0.60, 0.70];
+            greyBot = [0.60, 0.65, 0.75];
+        } else {
+            greyTop = [0.40, 0.45, 0.55];
+            greyMid = [0.48, 0.53, 0.62];
+            greyBot = [0.55, 0.60, 0.68];
+        }
+
+        top = _lerpArr(top, greyTop, oc);
+        mid = _lerpArr(mid, greyMid, oc);
+        bot = _lerpArr(bot, greyBot, oc);
+    }
+
+    t.skyTopColor = top;
+    t.skyMidColor = mid;
+    t.skyBottomColor = bot;
+
+    // Sun color: whiter at noon, warmer near horizon
+    if (sunsetFactor > 0.05) {
+        t.sunColor = [1.0, 0.85 - sunsetFactor * 0.2, 0.5 - sunsetFactor * 0.3];
+        t.sunGlowColor = [1.0, 0.7 - sunsetFactor * 0.2, 0.3 - sunsetFactor * 0.2];
+    } else if (overcast > 0.6) {
+        t.sunColor = [0.8, 0.8, 0.85];
+        t.sunGlowColor = [0.7, 0.7, 0.8];
+    } else {
+        t.sunColor = [1.0, 0.92, 0.65];
+        t.sunGlowColor = [1.0, 0.85, 0.4];
+    }
+
+    // Horizon glow: warm from sun
+    if (sunEl > 0 && sunEl < 30) {
+        let glow = (30 - sunEl) / 30;
+        t.horizonGlow = _lerpArr(
+            [0.65, 0.85, 1.0],
+            [1.0, 0.7, 0.3],
+            glow * (1 - overcast * 0.5)
+        );
+    } else {
+        t.horizonGlow = _lerpArr([0.65, 0.85, 1.0], bot, 0.5);
+    }
+};
+
+/* ── Calculate panel tint from scene ───────────────────────────────────── */
+SceneBuilder.prototype._calcPanelTint = function (t) {
+    let night = t.isNight;
+    let cloud = t.cloudCover;
+    let sunset = t.sunElevation > 0 && t.sunElevation < 20;
+
+    if (night || t.twilight < 0.1) {
+        // Night: cool blue-purple
+        t.panelTint = [0.6, 0.6, 0.9];
+    } else if (sunset) {
+        // Sunset: warm orange
+        t.panelTint = [1.0, 0.75, 0.55];
+    } else if (t.precipitationType === 'rain' || t.precipitationType === 'thunder' ||
+               t.precipitationType === 'drizzle') {
+        // Rain: cool blue
+        t.panelTint = [0.6, 0.7, 1.0];
+    } else if (t.precipitationType === 'snow') {
+        // Snow: cool light blue
+        t.panelTint = [0.75, 0.85, 1.0];
+    } else if (cloud > 0.6) {
+        // Cloudy: neutral grey
+        t.panelTint = [0.75, 0.78, 0.85];
+    } else {
+        // Sunny: warm tint
+        t.panelTint = [1.0, 0.95, 0.85];
+    }
+};
+
+/* ── Calculate ambient light ────────────────────────────────────────────── */
+SceneBuilder.prototype._calcAmbientLight = function (t) {
+    if (t.isNight || t.sunElevation < 5) {
+        let moonBright = t.moonIllumination * 0.3 + 0.1;
+        t.ambientLight = [moonBright * 0.5, moonBright * 0.5, moonBright];
+    } else {
+        let factor = Math.min(1, t.sunElevation / 45);
+        let cloudiness = Math.min(1, t.cloudCover * 1.3);
+        let brightness = 0.5 + 0.5 * (1 - cloudiness) * factor;
+        t.ambientLight = [brightness, brightness * 0.95, brightness * 0.9];
+    }
+};
+
+/* ── Update time and interpolate scene ─────────────────────────────────── */
+SceneBuilder.prototype.update = function (dt) {
+    this._time += dt;
+
+    // Animate cloud offsets for parallax scrolling
+    for (let i = 0; i < 3; i++) {
+        this._cloudOffsets[i] += dt * this._target.cloudSpeed[i] * (i + 1);
+        if (this._cloudOffsets[i] > 1000) this._cloudOffsets[i] -= 1000;
+    }
+
+    // Interpolate current → target
+    let speed = Math.min(1, this._transitionSpeed * dt);
+    this._interpolateScene(speed);
+};
+
+/* ── Lerp current scene toward target ──────────────────────────────────── */
+SceneBuilder.prototype._interpolateScene = function (t) {
+    let c = this._current;
+    let tar = this._target;
+
+    c.sunElevation      = _lerp(c.sunElevation, tar.sunElevation, t);
+    c.twilight          = _lerp(c.twilight, tar.twilight, t);
+    c.isNight           = tar.isNight; // instant (boolean)
+    c.timeOfDay         = tar.timeOfDay;
+    c.moonElevation     = _lerp(c.moonElevation, tar.moonElevation, t);
+    c.moonIllumination  = _lerp(c.moonIllumination, tar.moonIllumination, t);
+    c.moonVisible       = tar.moonVisible;
+    c.moonPhase         = tar.moonPhase;
+    c.cloudCover        = _lerp(c.cloudCover, tar.cloudCover, t);
+    c.fogIntensity      = _lerp(c.fogIntensity, tar.fogIntensity, t);
+    c.precipitation     = _lerp(c.precipitation, tar.precipitation, t);
+    c.precipitationType = tar.precipitationType; // instant
+    c.windSpeed         = _lerp(c.windSpeed, tar.windSpeed, t);
+    c.temperature       = _lerp(c.temperature, tar.temperature, t);
+
+    for (let i = 0; i < 3; i++) {
+        c.cloudOpacity[i] = _lerp(c.cloudOpacity[i], tar.cloudOpacity[i], t);
+        c.cloudScale[i]   = _lerp(c.cloudScale[i], tar.cloudScale[i], t);
+        c.cloudSpeed[i]   = _lerp(c.cloudSpeed[i], tar.cloudSpeed[i], t);
+        c.cloudDensity[i] = _lerp(c.cloudDensity[i], tar.cloudDensity[i], t);
+    }
+
+    c.skyTopColor    = _lerpArr(c.skyTopColor, tar.skyTopColor, t);
+    c.skyMidColor    = _lerpArr(c.skyMidColor, tar.skyMidColor, t);
+    c.skyBottomColor = _lerpArr(c.skyBottomColor, tar.skyBottomColor, t);
+    c.sunColor       = _lerpArr(c.sunColor, tar.sunColor, t);
+    c.sunGlowColor   = _lerpArr(c.sunGlowColor, tar.sunGlowColor, t);
+    c.horizonGlow    = _lerpArr(c.horizonGlow, tar.horizonGlow, t);
+    c.panelTint      = _lerpArr(c.panelTint, tar.panelTint, t);
+    c.ambientLight   = _lerpArr(c.ambientLight, tar.ambientLight, t);
+};
+
+/* ── Get cloud offset for animation ────────────────────────────────────── */
+SceneBuilder.prototype.getCloudOffset = function (layer) {
+    return this._cloudOffsets[layer] || 0;
+};
+
+/* ── Rough WMO→OWM reverse mapping ──────────────────────────────────────── */
+SceneBuilder.prototype._wmoFromOwmid = function (owmId) {
+    if (owmId === 800) return 0;
+    if (owmId === 801) return 2;
+    if (owmId === 802 || owmId === 803) return 3;
+    if (owmId === 804) return 3;
+    if (owmId >= 300 && owmId < 400) return 53;
+    if (owmId >= 500 && owmId < 512) return 63;
+    if (owmId >= 600 && owmId < 700) return 73;
+    if (owmId >= 700 && owmId < 800) return 45;
+    if (owmId >= 200 && owmId < 300) return 95;
+    return 0;
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  Utility functions
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+function _lerp(a, b, t) {
+    return a + (b - a) * t;
+}
+
+function _lerpArr(a, b, t) {
+    return [
+        a[0] + (b[0] - a[0]) * t,
+        a[1] + (b[1] - a[1]) * t,
+        a[2] + (b[2] - a[2]) * t
+    ];
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  Exports
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+var SceneBuilder = SceneBuilder;
+var PerlinNoise = PerlinNoise;
+var NoiseTexture = NoiseTexture;
+var fBm = fBm;

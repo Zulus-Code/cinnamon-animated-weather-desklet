@@ -1,10 +1,16 @@
-/* particleSystem.js — Weather particle system for weather-animated@zulus */
+/* particleSystem.js — Weather particle system for weather-animated@zulus
+ *
+ * Features enhanced multi-layer rain with depth perception
+ * and natural snow with drift, rotation, and varied trajectories.
+ */
 
-/* ── Particle constructor (not exported, used internally) ─────────────────── */
+/* ── Particle constructor ─────────────────────────────────────────────────── */
 function Particle(x, y, type) {
     this.x = x;
     this.y = y;
     this.type = type;
+
+    // Common
     this.vx = 0;
     this.vy = 0;
     this.size = 0;
@@ -12,35 +18,72 @@ function Particle(x, y, type) {
     this.life = 1;
     this.maxLife = 1;
     this.speed = 0;
+
+    // Depth layer (0=far, 1=near) for multi-layer effects
+    this.depth = Math.random();
+
+    // Wobble/trajectory
     this.wobble = 0;
     this.wobbleSpeed = 0;
     this.wobbleOffset = 0;
+
+    // Snow-specific
+    this.rotation = 0;
+    this.rotationSpeed = 0;
+    this.driftPhase = 0;
+    this.driftAmplitude = 0;
+
     this._init(type);
 }
 
 Particle.prototype._init = function (type) {
     switch (type) {
         case 'rain':
-            this.size = Math.random() * 2 + 1.5;
-            this.speed = 300 + Math.random() * 400;
+            // Depth determines speed, size, alpha
+            // Far (depth~0): slow, thin, dim
+            // Near (depth~1): fast, thick, bright
+            let rd = this.depth;
+            this.size = (0.8 + rd * 1.8) * (1 + Math.random() * 0.3);
+            this.speed = (250 + rd * 500 + Math.random() * 150);
             this.vy = this.speed;
-            this.vx = -20 - Math.random() * 30;
-            this.alpha = 0.4 + Math.random() * 0.5;
+            // Wind shear: more horizontal at distance
+            this.vx = -15 - rd * 30 - Math.random() * 15;
+            // Alpha: far=dim, near=bright
+            this.alpha = 0.25 + rd * 0.55 + Math.random() * 0.1;
+            // Streak length: near=longer
+            this._streakLen = 0.02 + rd * 0.04;
             break;
+
         case 'snow':
-            this.size = Math.random() * 4 + 2;
-            this.speed = 40 + Math.random() * 60;
+            let sd = this.depth;
+            // Size varies with depth (near=larger)
+            this.size = (1.5 + sd * 4) * (0.7 + Math.random() * 0.6);
+            // Fall speed: far=slow, near=fast (but much slower than rain)
+            this.speed = (20 + sd * 60 + Math.random() * 30);
             this.vy = this.speed;
-            this.wobble = Math.random() * 30 + 10;
-            this.wobbleSpeed = 1 + Math.random() * 2;
+            // Horizontal drift: sine wave
+            this.driftPhase = Math.random() * Math.PI * 2;
+            this.driftAmplitude = (5 + sd * 25) * (0.5 + Math.random() * 0.5);
+            // Wobble (swaying motion)
+            this.wobble = (1 + sd * 3) * (0.5 + Math.random() * 0.5);
+            this.wobbleSpeed = 0.8 + Math.random() * 1.5;
             this.wobbleOffset = Math.random() * Math.PI * 2;
-            this.alpha = 0.6 + Math.random() * 0.4;
+            // Rotation while falling
+            this.rotation = Math.random() * Math.PI * 2;
+            this.rotationSpeed = (Math.random() - 0.5) * 1.5;
+            // Horizontal wind base
+            this.vx = -3 - Math.random() * 8;
+            // Alpha: near=more visible
+            this.alpha = 0.35 + sd * 0.5 + Math.random() * 0.1;
+            this._rotationAngle = 0;
             break;
+
         case 'cloud':
             this.size = 40 + Math.random() * 80;
             this.vx = -5 - Math.random() * 10;
             this.alpha = 0.15 + Math.random() * 0.2;
             break;
+
         case 'star':
             this.size = 1 + Math.random() * 2;
             this.maxLife = 40 + Math.random() * 80;
@@ -48,6 +91,7 @@ Particle.prototype._init = function (type) {
             this.alpha = 0.3 + Math.random() * 0.7;
             this.wobble = Math.random() * 0.002;
             break;
+
         case 'sparkle':
             this.size = 2 + Math.random() * 4;
             this.maxLife = 20 + Math.random() * 30;
@@ -71,25 +115,33 @@ ParticleSystem.prototype.init = function (width, height, weatherId, isNight) {
     this._time = 0;
 
     if (weatherId >= 200 && weatherId < 300) {
-        for (let i = 0; i < 200; i++)
+        // Thunderstorm: heavy rain + varied particles
+        for (let i = 0; i < 250; i++)
             this.particles.push(new Particle(Math.random() * width, Math.random() * height, 'rain'));
     } else if (weatherId >= 300 && weatherId < 400) {
-        for (let i = 0; i < 80; i++)
+        // Drizzle: lighter rain
+        for (let i = 0; i < 60; i++)
             this.particles.push(new Particle(Math.random() * width, Math.random() * height, 'rain'));
     } else if (weatherId >= 500 && weatherId < 600) {
-        let count = weatherId >= 502 ? 180 : 100;
+        // Rain
+        let count = weatherId >= 502 ? 200 : 100;
         for (let i = 0; i < count; i++)
             this.particles.push(new Particle(Math.random() * width, Math.random() * height, 'rain'));
     } else if (weatherId >= 600 && weatherId < 700) {
-        for (let i = 0; i < 120; i++)
+        // Snow
+        let count = weatherId >= 602 ? 180 : 120;
+        for (let i = 0; i < count; i++)
             this.particles.push(new Particle(Math.random() * width, Math.random() * height, 'snow'));
     } else if (weatherId === 800 && isNight) {
+        // Stars
         for (let i = 0; i < 80; i++)
             this.particles.push(new Particle(Math.random() * width, Math.random() * height * 0.7, 'star'));
     } else if (weatherId === 800) {
+        // Clear day: sparkles
         for (let i = 0; i < 15; i++)
             this.particles.push(new Particle(Math.random() * width, height * 0.3 + Math.random() * height * 0.4, 'sparkle'));
     } else if (weatherId >= 801 && weatherId < 900) {
+        // Cloudy
         for (let i = 0; i < 4; i++)
             this.particles.push(new Particle(Math.random() * width, Math.random() * height * 0.5, 'cloud'));
         if (weatherId >= 803) {
@@ -97,6 +149,7 @@ ParticleSystem.prototype.init = function (width, height, weatherId, isNight) {
                 this.particles.push(new Particle(Math.random() * width, Math.random() * height, 'rain'));
         }
     } else if (weatherId >= 700 && weatherId < 800) {
+        // Foggy
         for (let i = 0; i < 6; i++)
             this.particles.push(new Particle(Math.random() * width, Math.random() * height * 0.6, 'cloud'));
     }
@@ -105,33 +158,17 @@ ParticleSystem.prototype.init = function (width, height, weatherId, isNight) {
 /* Update all particle positions */
 ParticleSystem.prototype.update = function (dt, width, height) {
     this._time += dt;
-    let p, i;
 
-    for (i = this.particles.length - 1; i >= 0; i--) {
-        p = this.particles[i];
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+        let p = this.particles[i];
 
         switch (p.type) {
             case 'rain':
-                p.x += p.vx * dt;
-                p.y += p.vy * dt;
-                if (p.y >= height + 10) {
-                    p.y = -10;
-                    p.x = Math.random() * width;
-                }
-                if (p.x < -20) p.x = width + 20;
+                this._updateRain(p, dt, width, height);
                 break;
 
             case 'snow':
-                p.wobbleOffset += p.wobbleSpeed * dt;
-                p.x += p.vx * dt + Math.sin(p.wobbleOffset) * p.wobble * dt;
-                p.y += p.vy * dt;
-                if (p.y >= height + 5) {
-                    p.y = -5;
-                    p.x = Math.random() * width;
-                    p.wobbleOffset = Math.random() * Math.PI * 2;
-                }
-                if (p.x < -20) p.x = width + 20;
-                if (p.x > width + 20) p.x = -20;
+                this._updateSnow(p, dt, width, height);
                 break;
 
             case 'cloud':
@@ -169,27 +206,83 @@ ParticleSystem.prototype.update = function (dt, width, height) {
     }
 };
 
+/* ── Rain update with multi-layer depth ──────────────────────────────────── */
+ParticleSystem.prototype._updateRain = function (p, dt, w, h) {
+    // Depth affects speed (parallax-like)
+    let speedFactor = 0.6 + p.depth * 0.8;
+    let actualVx = p.vx * speedFactor;
+    let actualVy = p.vy * speedFactor;
+
+    p.x += actualVx * dt;
+    p.y += actualVy * dt;
+
+    // Wind gust: subtle horizontal push based on time and depth
+    let gust = Math.sin(this._time * 0.7 + p.wobbleOffset) * 5 * (0.3 + p.depth * 0.7);
+    p.x += gust * dt;
+
+    if (p.y >= h + 10) {
+        p.y = -10;
+        p.x = Math.random() * w;
+        p.depth = Math.random(); // new random depth for variety
+    }
+    if (p.x < -30) p.x = w + 30;
+    if (p.x > w + 30 && actualVx > 0) p.x = -30;
+};
+
+/* ── Snow update with natural movement ────────────────────────────────────── */
+ParticleSystem.prototype._updateSnow = function (p, dt, w, h) {
+    // Advance wobble phase
+    p.wobbleOffset += p.wobbleSpeed * dt;
+
+    // Horizontal drift: sine wave + random gust + wind
+    let drift = Math.sin(this._time * p.wobbleSpeed + p.driftPhase) * p.driftAmplitude;
+
+    // Gust: occasional wind burst
+    let gust = Math.sin(this._time * 0.3 + p.wobbleOffset) * 8;
+    gust *= Math.max(0, Math.sin(this._time * 0.5 + p.driftPhase));
+
+    // Slow horizontal wind
+    let wind = p.vx * (0.5 + p.depth * 0.5);
+
+    // Combine horizontal movement
+    let hMove = (wind + drift + gust) * dt;
+
+    // Vertical speed with slight wobble
+    let vWobble = Math.sin(this._time * 2 + p.wobbleOffset * 3) * 5 * dt;
+    let vMove = (p.vy + vWobble) * dt;
+
+    p.x += hMove;
+    p.y += vMove;
+
+    // Update rotation
+    p._rotationAngle = (p._rotationAngle || 0) + p.rotationSpeed * dt;
+    if (p._rotationAngle > Math.PI * 2) p._rotationAngle -= Math.PI * 2;
+
+    // Wrap around
+    if (p.y >= h + 10) {
+        p.y = -10 - Math.random() * 20;
+        p.x = Math.random() * w;
+        p.depth = Math.random();
+        p.driftPhase = Math.random() * Math.PI * 2;
+        p.driftAmplitude = (5 + p.depth * 25) * (0.5 + Math.random() * 0.5);
+    }
+    if (p.x < -40) p.x = w + 40;
+    if (p.x > w + 40) p.x = -40;
+};
+
 /* Draw all particles via Cairo context */
 ParticleSystem.prototype.draw = function (cr) {
-    let p, i, twinkle, s;
-
-    for (i = 0; i < this.particles.length; i++) {
-        p = this.particles[i];
+    for (let i = 0; i < this.particles.length; i++) {
+        let p = this.particles[i];
         cr.save();
 
         switch (p.type) {
             case 'rain':
-                cr.setSourceRGBA(0.7, 0.8, 1, p.alpha * 0.6);
-                cr.setLineWidth(p.size * 0.5);
-                cr.moveTo(p.x, p.y);
-                cr.lineTo(p.x + p.vx * 0.03, p.y + p.vy * 0.03);
-                cr.stroke();
+                this._drawRain(cr, p);
                 break;
 
             case 'snow':
-                cr.setSourceRGBA(1, 1, 1, p.alpha);
-                cr.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2);
-                cr.fill();
+                this._drawSnow(cr, p);
                 break;
 
             case 'cloud':
@@ -201,18 +294,7 @@ ParticleSystem.prototype.draw = function (cr) {
                 break;
 
             case 'star':
-                cr.setSourceRGBA(1, 1, 1, p.alpha);
-                twinkle = 0.5 + 0.5 * Math.sin(this._time * 3 + p.wobbleOffset * 10);
-                s = p.size * (0.5 + twinkle * 0.5);
-                cr.arc(p.x, p.y, s, 0, Math.PI * 2);
-                cr.fill();
-                cr.setLineWidth(0.5);
-                cr.setSourceRGBA(1, 1, 1, p.alpha * 0.3);
-                cr.moveTo(p.x - s * 3, p.y);
-                cr.lineTo(p.x + s * 3, p.y);
-                cr.moveTo(p.x, p.y - s * 3);
-                cr.lineTo(p.x, p.y + s * 3);
-                cr.stroke();
+                this._drawStar(cr, p);
                 break;
 
             case 'sparkle':
@@ -224,6 +306,111 @@ ParticleSystem.prototype.draw = function (cr) {
 
         cr.restore();
     }
+};
+
+/* ── Draw rain streak with depth-dependent appearance ────────────────────── */
+ParticleSystem.prototype._drawRain = function (cr, p) {
+    // Color: slightly blue, more opaque near
+    let r = 0.55 + p.depth * 0.25;
+    let g = 0.65 + p.depth * 0.25;
+    let b = 0.85 + p.depth * 0.15;
+
+    // Streak length based on depth
+    let streakLen = p._streakLen || (0.02 + p.depth * 0.04);
+    let speedFactor = 0.6 + p.depth * 0.8;
+
+    cr.setSourceRGBA(r, g, b, p.alpha * 0.7);
+    cr.setLineWidth(p.size * 0.4 * (0.6 + p.depth * 0.4));
+
+    let dx = p.vx * speedFactor * streakLen;
+    let dy = p.vy * speedFactor * streakLen;
+
+    cr.moveTo(p.x, p.y);
+    cr.lineTo(p.x + dx, p.y + dy);
+    cr.stroke();
+
+    // Near drops get a slight glow
+    if (p.depth > 0.6) {
+        cr.setSourceRGBA(r, g, b, p.alpha * 0.1);
+        cr.setLineWidth(p.size * 1.2);
+        cr.moveTo(p.x - dx * 0.1, p.y - dy * 0.1);
+        cr.lineTo(p.x + dx * 1.1, p.y + dy * 1.1);
+        cr.stroke();
+    }
+};
+
+/* ── Draw snowflake with rotation and shape ──────────────────────────────── */
+ParticleSystem.prototype._drawSnow = function (cr, p) {
+    let alpha = p.alpha * (0.6 + 0.4 * (0.5 + 0.5 * Math.sin(this._time * 2 + p.wobbleOffset)));
+    let s = p.size * 0.5;
+    let angle = p._rotationAngle || 0;
+
+    cr.setSourceRGBA(1, 1, 1, alpha);
+
+    // Draw snowflake as a small circle with subtle hexagonal hint
+    if (s > 3) {
+        // Larger flakes: draw a simple star pattern
+        cr.translate(p.x, p.y);
+        cr.rotate(angle);
+
+        // Central dot
+        cr.arc(0, 0, s * 0.3, 0, Math.PI * 2);
+        cr.fill();
+
+        // 6-pointed star (simplified snowflake)
+        cr.setLineWidth(s * 0.2);
+        cr.setSourceRGBA(1, 1, 1, alpha * 0.5);
+        for (let arm = 0; arm < 6; arm++) {
+            let a = arm * Math.PI / 3;
+            cr.moveTo(0, 0);
+            cr.lineTo(Math.cos(a) * s, Math.sin(a) * s);
+            cr.stroke();
+
+            // Tiny branches
+            let bx = Math.cos(a) * s * 0.6;
+            let by = Math.sin(a) * s * 0.6;
+            cr.moveTo(bx, by);
+            cr.lineTo(bx + Math.cos(a + 0.4) * s * 0.3,
+                       by + Math.sin(a + 0.4) * s * 0.3);
+            cr.stroke();
+            cr.moveTo(bx, by);
+            cr.lineTo(bx + Math.cos(a - 0.4) * s * 0.3,
+                       by + Math.sin(a - 0.4) * s * 0.3);
+            cr.stroke();
+        }
+
+        // Outer glow
+        cr.setSourceRGBA(1, 1, 1, alpha * 0.08);
+        cr.arc(0, 0, s * 2, 0, Math.PI * 2);
+        cr.fill();
+    } else {
+        // Small flakes: simple dot
+        cr.arc(p.x, p.y, s * 0.8, 0, Math.PI * 2);
+        cr.fill();
+
+        // Faint glow
+        cr.setSourceRGBA(1, 1, 1, alpha * 0.05);
+        cr.arc(p.x, p.y, s * 2, 0, Math.PI * 2);
+        cr.fill();
+    }
+};
+
+/* ── Draw star with twinkle ──────────────────────────────────────────────── */
+ParticleSystem.prototype._drawStar = function (cr, p) {
+    cr.setSourceRGBA(1, 1, 1, p.alpha);
+    let twinkle = 0.5 + 0.5 * Math.sin(this._time * 3 + p.wobbleOffset * 10);
+    let s = p.size * (0.5 + twinkle * 0.5);
+    cr.arc(p.x, p.y, s, 0, Math.PI * 2);
+    cr.fill();
+
+    // Cross
+    cr.setLineWidth(0.5);
+    cr.setSourceRGBA(1, 1, 1, p.alpha * 0.3);
+    cr.moveTo(p.x - s * 3, p.y);
+    cr.lineTo(p.x + s * 3, p.y);
+    cr.moveTo(p.x, p.y - s * 3);
+    cr.lineTo(p.x, p.y + s * 3);
+    cr.stroke();
 };
 
 var ParticleSystem = ParticleSystem;

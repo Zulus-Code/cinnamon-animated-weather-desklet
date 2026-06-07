@@ -1,6 +1,8 @@
 /* weather-animated@zulus - desklet.js
  * Animated real-time weather desklet for Cinnamon (Linux Mint)
  * Uses Open-Meteo API (no API key required)
+ *
+ * Enhanced with procedural scene rendering via SceneBuilder.
  */
 
 const Desklet = imports.ui.desklet;
@@ -20,6 +22,7 @@ const Utils = imports.utils;
 const WeatherServiceModule = imports.weatherService;
 const ParticleSystemModule = imports.particleSystem;
 const RendererModule = imports.renderer;
+const SceneBuilderModule = imports.sceneBuilder;
 
 /* ── Main desklet class ──────────────────────────────────────────────────── */
 
@@ -41,10 +44,18 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this._sunriseMinutes = null;
         this._sunsetMinutes = null;
 
+        // ── Scene system ──
+        this._sceneBuilder = new SceneBuilderModule.SceneBuilder();
+        this._scene = this._sceneBuilder._defaultScene(); // initial scene
+        this._sceneTime = 0;
+
         // Create service modules
         this._weatherService = new WeatherServiceModule.WeatherService();
         this._particleSystem = new ParticleSystemModule.ParticleSystem();
         this._renderer = new RendererModule.Renderer(this);
+
+        // Pass noise texture to renderer for cloud/fog masks
+        this._renderer.setNoiseTexture(this._sceneBuilder.getNoiseTex());
 
         this.settings = new Settings.DeskletSettings(this, this._uuid, desklet_id);
         this.settings.bindProperty(Settings.BindingDirection.IN, 'location', 'location', this._onSettingsChanged.bind(this));
@@ -184,6 +195,17 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this._loading = false;
         this._error = null;
         this._initParticles();
+
+        // Update scene target from weather data
+        if (this._sceneBuilder) {
+            this._sceneBuilder.buildScene(
+                this._weather,
+                this._sunriseMinutes,
+                this._sunsetMinutes,
+                this.language
+            );
+        }
+
         if (this._drawArea) this._drawArea.queue_repaint();
     }
 
@@ -194,6 +216,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
     }
 
     /* ── Night detection via sunrise/sunset ─────────────────────────────── */
+    /* (kept for backwards compatibility with theme colors) */
 
     _isNight() {
         if (this._sunriseMinutes === null || this._sunsetMinutes === null) {
@@ -205,7 +228,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         return curMin < this._sunriseMinutes || curMin > this._sunsetMinutes;
     }
 
-    /* ── Animation loop (60 fps) ────────────────────────────────────────── */
+    /* ── Animation loop (≈30 fps) ───────────────────────────────────────── */
 
     _startAnimation() {
         if (this._animating) return;
@@ -222,6 +245,14 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this._lastFrameTime = now;
         if (dt > 0.1) dt = 0.1;
 
+        // ── Update scene interpolation ──
+        if (this._sceneBuilder) {
+            this._sceneBuilder.update(dt);
+            this._scene = this._sceneBuilder._current;
+            this._sceneTime += dt;
+        }
+
+        // ── Update particles ──
         if (this._weather && !this._loading && !this._error) {
             this._particleSystem.update(dt, this._width, this._height);
         }
