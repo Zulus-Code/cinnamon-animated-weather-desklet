@@ -3,7 +3,7 @@
 A beautiful, real-time animated weather desklet for Linux Mint Cinnamon desktop. Features live particle effects (rain, snow, drifting clouds, twinkling stars), glassmorphism UI, auto-detection of your location, and **full Russian language support**.
 
 
-![Animated Weather Desklet screenshot](screenshot.png)
+![Animated Weather Desklet](animated.gif)
 
 ## ✨ Features
 
