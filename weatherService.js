@@ -170,7 +170,7 @@ WeatherService.prototype.resolveLocation = function (location, language, onSucce
                 const json = JSON.parse(data);
                 if (json.results && json.results.length > 0) {
                     const r = json.results[0];
-                    onSuccess(r.latitude, r.longitude, r.name || location, r.country_code || '');
+                    onSuccess(r.latitude, r.longitude, r.name || location, r.country || r.country_code || '');
                     return;
                 }
             } catch (e) {}

@@ -314,12 +314,12 @@ SceneBuilder.prototype._defaultScene = function () {
         windSpeed: 0,             // km/h
 
         // Sky colors
-        skyTopColor:    [0.25, 0.50, 0.90],
-        skyMidColor:    [0.45, 0.70, 0.95],
-        skyBottomColor: [0.65, 0.85, 1.00],
-        sunColor:       [1.00, 0.90, 0.60],
-        sunGlowColor:   [1.00, 0.85, 0.40],
-        horizonGlow:    [0.80, 0.90, 1.00],
+        skyTopColor:    [0.18, 0.42, 0.78],
+        skyMidColor:    [0.36, 0.56, 0.84],
+        skyBottomColor: [0.58, 0.74, 0.90],
+        sunColor:       [1.00, 0.92, 0.68],
+        sunGlowColor:   [1.00, 0.85, 0.45],
+        horizonGlow:    [0.78, 0.88, 0.95],
 
         // Panel tint
         panelTint: [1, 1, 1],
@@ -587,17 +587,21 @@ SceneBuilder.prototype._calcSkyColors = function (t, sunEl, twilight,
     const twilightFactor = Math.max(0, Math.min(1, twilight));
 
     // Base sky colors for different conditions
-    const topDay = [0.25, 0.50, 0.90];
-    const midDay = [0.45, 0.70, 0.95];
-    const botDay = [0.65, 0.85, 1.00];
+    // Naturalistic daylight: Rayleigh-scattered blue with subtle green at zenith,
+    // whitening toward horizon (aerial perspective)
+    const topDay = [0.18, 0.42, 0.78];
+    const midDay = [0.36, 0.56, 0.84];
+    const botDay = [0.58, 0.74, 0.90];
 
-    const topNight = [0.02, 0.02, 0.10];
-    const midNight = [0.04, 0.04, 0.15];
-    const botNight = [0.06, 0.06, 0.20];
+    // Night sky: deep navy with subtle atmospheric glow at horizon
+    const topNight = [0.03, 0.04, 0.13];
+    const midNight = [0.06, 0.07, 0.19];
+    const botNight = [0.10, 0.10, 0.25];
 
-    const topTwilight = [0.15, 0.08, 0.20];
-    const midTwilight = [0.50, 0.20, 0.15];
-    const botTwilight = [0.90, 0.50, 0.20];
+    // Twilight: atmospheric scattering yields purple-blue → rose → warm horizon
+    const topTwilight = [0.10, 0.12, 0.32];
+    const midTwilight = [0.38, 0.28, 0.35];
+    const botTwilight = [0.72, 0.48, 0.30];
 
     // Sunset warm tones (when sun is low)
     let sunsetFactor = 0;
@@ -623,8 +627,8 @@ SceneBuilder.prototype._calcSkyColors = function (t, sunEl, twilight,
         // Overcast modifies night colors
         if (overcast > 0.3) {
             const oc = Math.min(1, (overcast - 0.3) / 0.7);
-            const greyTop = [0.08, 0.08, 0.12];
-            const greyBot = [0.12, 0.12, 0.18];
+            const greyTop = [0.10, 0.10, 0.14];
+            const greyBot = [0.15, 0.15, 0.22];
             top = _lerpArr(top, greyTop, oc);
             mid = _lerpArr(mid, greyTop, oc);
             bot = _lerpArr(bot, greyBot, oc);
@@ -632,7 +636,7 @@ SceneBuilder.prototype._calcSkyColors = function (t, sunEl, twilight,
 
         // Snow at night is brighter
         if (isSnowy) {
-            const bright = [0.15, 0.15, 0.22];
+            const bright = [0.18, 0.18, 0.25];
             top = _lerpArr(top, bright, 0.4);
             mid = _lerpArr(mid, bright, 0.4);
             bot = _lerpArr(bot, bright, 0.3);
@@ -641,9 +645,9 @@ SceneBuilder.prototype._calcSkyColors = function (t, sunEl, twilight,
         t.skyTopColor = top;
         t.skyMidColor = mid;
         t.skyBottomColor = bot;
-        t.sunColor = [0.8, 0.85, 1.0];
-        t.sunGlowColor = [0.3, 0.4, 0.8];
-        t.horizonGlow = sunsetFactor > 0.5 ? [0.4, 0.2, 0.1] : [0.05, 0.05, 0.15];
+        t.sunColor = [0.82, 0.87, 1.0];
+        t.sunGlowColor = [0.28, 0.38, 0.78];
+        t.horizonGlow = sunsetFactor > 0.5 ? [0.35, 0.18, 0.08] : [0.06, 0.06, 0.18];
         return;
     }
 
@@ -663,9 +667,9 @@ SceneBuilder.prototype._calcSkyColors = function (t, sunEl, twilight,
 
     // Apply sunset coloration
     if (sunsetFactor > 0.05 && !night) {
-        const warmTop = [0.30, 0.15, 0.25];
-        const warmMid = [0.70, 0.30, 0.15];
-        const warmBot = [1.00, 0.65, 0.30];
+        const warmTop = [0.28, 0.14, 0.28];
+        const warmMid = [0.72, 0.32, 0.17];
+        const warmBot = [0.96, 0.58, 0.26];
 
         top = _lerpArr(top, warmTop, sunsetFactor * 0.6);
         mid = _lerpArr(mid, warmMid, sunsetFactor * 0.8);
@@ -678,17 +682,17 @@ SceneBuilder.prototype._calcSkyColors = function (t, sunEl, twilight,
         let greyTop, greyMid, greyBot;
 
         if (isRainy) {
-            greyTop = [0.30, 0.35, 0.45];
-            greyMid = [0.35, 0.40, 0.50];
-            greyBot = [0.40, 0.48, 0.55];
+            greyTop = [0.32, 0.37, 0.44];
+            greyMid = [0.38, 0.43, 0.50];
+            greyBot = [0.45, 0.50, 0.56];
         } else if (isSnowy) {
-            greyTop = [0.50, 0.55, 0.65];
-            greyMid = [0.55, 0.60, 0.70];
-            greyBot = [0.60, 0.65, 0.75];
+            greyTop = [0.52, 0.57, 0.64];
+            greyMid = [0.58, 0.63, 0.70];
+            greyBot = [0.64, 0.68, 0.74];
         } else {
-            greyTop = [0.40, 0.45, 0.55];
-            greyMid = [0.48, 0.53, 0.62];
-            greyBot = [0.55, 0.60, 0.68];
+            greyTop = [0.42, 0.47, 0.54];
+            greyMid = [0.50, 0.55, 0.62];
+            greyBot = [0.58, 0.63, 0.68];
         }
 
         top = _lerpArr(top, greyTop, oc);
@@ -702,26 +706,26 @@ SceneBuilder.prototype._calcSkyColors = function (t, sunEl, twilight,
 
     // Sun color: whiter at noon, warmer near horizon
     if (sunsetFactor > 0.05) {
-        t.sunColor = [1.0, 0.85 - sunsetFactor * 0.2, 0.5 - sunsetFactor * 0.3];
-        t.sunGlowColor = [1.0, 0.7 - sunsetFactor * 0.2, 0.3 - sunsetFactor * 0.2];
+        t.sunColor = [1.0, 0.82 - sunsetFactor * 0.15, 0.46 - sunsetFactor * 0.25];
+        t.sunGlowColor = [1.0, 0.65 - sunsetFactor * 0.2, 0.25 - sunsetFactor * 0.18];
     } else if (overcast > 0.6) {
         t.sunColor = [0.8, 0.8, 0.85];
         t.sunGlowColor = [0.7, 0.7, 0.8];
     } else {
-        t.sunColor = [1.0, 0.92, 0.65];
-        t.sunGlowColor = [1.0, 0.85, 0.4];
+        t.sunColor = [1.0, 0.92, 0.68];
+        t.sunGlowColor = [1.0, 0.85, 0.45];
     }
 
     // Horizon glow: warm from sun
     if (sunEl > 0 && sunEl < 30) {
         const glow = (30 - sunEl) / 30;
         t.horizonGlow = _lerpArr(
-            [0.65, 0.85, 1.0],
-            [1.0, 0.7, 0.3],
+            [0.58, 0.74, 0.90],
+            [0.96, 0.65, 0.28],
             glow * (1 - overcast * 0.5)
         );
     } else {
-        t.horizonGlow = _lerpArr([0.65, 0.85, 1.0], bot, 0.5);
+        t.horizonGlow = _lerpArr([0.58, 0.74, 0.90], bot, 0.5);
     }
 };
 

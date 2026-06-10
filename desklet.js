@@ -107,6 +107,13 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
             this._renderer.draw(this._drawArea);
         }));
         this.setContent(this._drawArea);
+
+        // Apply rounded corners directly to the outer container
+        // St clips children to parent's border-radius, so this ensures
+        // the entire desklet (including background, glass, and UI) has rounded corners.
+        if (this.actor) {
+            try { this.actor.set_style('border-radius: 24px;'); } catch (e) {}
+        }
     }
 
     /**
@@ -115,9 +122,10 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
      * @returns {void}
      */
     _setContainerTransparent(transparent) {
+        // Always keep border-radius; add transparent background when needed
         const style = transparent
-            ? 'background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important;'
-            : null;
+            ? 'border-radius: 24px !important; background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important;'
+            : 'border-radius: 24px;';
 
         const apply = function (widget) {
             if (!widget || typeof widget.set_style !== 'function') return;
@@ -337,6 +345,10 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
                 this._sceneBuilder.update(dt);
                 this._scene = this._sceneBuilder._current;
                 this._sceneTime += dt;
+                // Pass ambient light to particle system for natural color integration
+                if (this._particleSystem && this._scene.ambientLight) {
+                    this._particleSystem.ambientLight = this._scene.ambientLight;
+                }
             }
 
             // ── Update particles ──

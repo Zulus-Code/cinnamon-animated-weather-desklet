@@ -201,4 +201,50 @@ test('_themeColors nature returns nature palette', () => {
     assert.deepStrictEqual(tc.dim, [0.60, 0.75, 0.55]);
 });
 
+/* ── Date/time formatting (for _drawWeather) ──────────────────────────────── */
+
+/**
+ * Format current date+time string for display (mimics the logic in renderer.js).
+ * @param {string} lang - Language code ('ru' or 'en')
+ * @returns {string} Formatted date+time string
+ */
+function _formatDateTime(lang) {
+    const locale = lang === 'ru' ? 'ru-RU' : 'en-US';
+    const now = new Date();
+    return now.toLocaleString(locale, {
+        day: 'numeric', month: 'long',
+        hour: '2-digit', minute: '2-digit'
+    });
+}
+
+test('_formatDateTime ru contains Russian month name', () => {
+    const s = _formatDateTime('ru');
+    // Should contain a month name in Russian (января, февраля, ...)
+    const ruMonths = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+                      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    const hasRuMonth = ruMonths.some(m => s.includes(m));
+    assert.ok(hasRuMonth, 'ru date string "' + s + '" should contain a Russian month');
+});
+
+test('_formatDateTime en contains English month name', () => {
+    const s = _formatDateTime('en');
+    const enMonths = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+    const hasEnMonth = enMonths.some(m => s.includes(m));
+    assert.ok(hasEnMonth, 'en date string "' + s + '" should contain an English month');
+});
+
+test('_formatDateTime string fits within minimum desklet width (200px)', () => {
+    // Approximate Pango text width: ~7-9px per char at 14px bold
+    const sRu = _formatDateTime('ru');
+    const sEn = _formatDateTime('en');
+    const estWidth = Math.max(sRu.length, sEn.length) * 9;
+    // At cx=100 (w=200), half-width text must be ≤100
+    assert.ok(estWidth / 2 <= 100,
+        'Estimated width ' + estWidth + 'px (' + sEn.length + ' chars) exceeds 200px desklet');
+    // Verify actual character count is reasonable
+    assert.ok(sRu.length < 30, 'ru string "' + sRu + '" is too long (' + sRu.length + ' chars)');
+    assert.ok(sEn.length < 35, 'en string "' + sEn + '" is too long (' + sEn.length + ' chars)');
+});
+
 module.exports = { passed, failed, errors };

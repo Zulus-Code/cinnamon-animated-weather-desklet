@@ -1,4 +1,9 @@
 /* weather-animated@zulus — stylesheet.css */
-.desklet-with-header {
-    border-radius: 20px;
+.desklet,
+.desklet-with-borders,
+.desklet-with-borders-and-header {
+    border-radius: 24px;
+    /* Subtle outer glow for atmospheric depth */
+    box-shadow: 0 2px 24px rgba(0, 0, 0, 0.15),
+                0 0 60px rgba(0, 0, 0, 0.06);
 }

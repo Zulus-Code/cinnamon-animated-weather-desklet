@@ -131,6 +131,11 @@ Renderer.prototype.draw = function (area) {
         return;
     }
 
+    // ── Clip to rounded rectangle — so ALL drawing respects rounded corners ──
+    const cornerR = 24;
+    this._roundRect(cr, 0, 0, w, h, cornerR);
+    cr.clip();
+
     // ── Sky background (gradient) — only when background ON ──
     if (d.showBackground !== false) {
         try {
@@ -220,22 +225,29 @@ Renderer.prototype.draw = function (area) {
  * @returns {void}
  */
 Renderer.prototype._drawSimpleFallback = function (cr, w, h) {
-    const d = this._d;
-    const wid = d._weather ? d._weather.weather[0].id : 800;
-    const night = d._isNight();
-    let c;
-    if (wid >= 200 && wid < 300) c = Constants.COLORS.sky.stormy;
-    else if (wid >= 300 && wid < 600) c = night ? Constants.COLORS.sky.rainy_night : Constants.COLORS.sky.rainy_day;
-    else if (wid >= 600 && wid < 700) c = night ? Constants.COLORS.sky.snowy_night : Constants.COLORS.sky.snowy_day;
-    else if (wid >= 700 && wid < 800) c = Constants.COLORS.sky.foggy;
-    else if (wid === 800) c = night ? Constants.COLORS.sky.clear_night : Constants.COLORS.sky.clear_day;
-    else if (wid >= 801) c = night ? Constants.COLORS.sky.cloudy_night : Constants.COLORS.sky.cloudy_day;
-    else c = night ? Constants.COLORS.sky.stormy : Constants.COLORS.sky.cloudy_day;
+    const dayTop = [0.18, 0.42, 0.78], dayBot = [0.58, 0.74, 0.90];
+    const nightTop = [0.03, 0.04, 0.13], nightBot = [0.10, 0.10, 0.25];
+    const cloudyDayTop = [0.42, 0.47, 0.54], cloudyDayBot = [0.58, 0.63, 0.68];
+    const cloudyNightTop = [0.10, 0.10, 0.14], cloudyNightBot = [0.15, 0.15, 0.22];
+    const rainyDayTop = [0.32, 0.37, 0.44], rainyDayBot = [0.45, 0.50, 0.56];
+    const rainyNightTop = [0.08, 0.09, 0.17], rainyNightBot = [0.12, 0.13, 0.22];
+    const snowyDayTop = [0.52, 0.57, 0.64], snowyDayBot = [0.64, 0.68, 0.74];
+    const snowyNightTop = [0.12, 0.12, 0.22], snowyNightBot = [0.18, 0.18, 0.30];
+    const stormyTop = [0.08, 0.10, 0.16], stormyBot = [0.14, 0.16, 0.22];
+    const foggyTop = [0.55, 0.60, 0.68], foggyBot = [0.65, 0.70, 0.78];
+
+    let top, bot;
+    if (wid >= 200 && wid < 300) { top = stormyTop; bot = stormyBot; }
+    else if (wid >= 300 && wid < 600) { top = night ? rainyNightTop : rainyDayTop; bot = night ? rainyNightBot : rainyDayBot; }
+    else if (wid >= 600 && wid < 700) { top = night ? snowyNightTop : snowyDayTop; bot = night ? snowyNightBot : snowyDayBot; }
+    else if (wid >= 700 && wid < 800) { top = foggyTop; bot = foggyBot; }
+    else if (wid === 800) { top = night ? nightTop : dayTop; bot = night ? nightBot : dayBot; }
+    else if (wid >= 801) { top = night ? cloudyNightTop : cloudyDayTop; bot = night ? cloudyNightBot : cloudyDayBot; }
+    else { top = stormyTop; bot = cloudyDayBot; }
 
     const pat = new Cairo.LinearGradient(0, 0, 0, h);
-    const c1 = Utils._hexToRgba(c[0]), c2 = Utils._hexToRgba(c[1]);
-    pat.addColorStopRGBA(0, c1[0], c1[1], c1[2], 1);
-    pat.addColorStopRGBA(1, c2[0], c2[1], c2[2], 1);
+    pat.addColorStopRGBA(0, top[0], top[1], top[2], 1);
+    pat.addColorStopRGBA(1, bot[0], bot[1], bot[2], 1);
     cr.setSource(pat);
     cr.rectangle(0, 0, w, h);
     cr.fill();
@@ -349,17 +361,14 @@ Renderer.prototype._drawSunMoon = function (cr, w, h, scene) {
     cr.rectangle(0, 0, w, h);
     cr.fill();
 
-    // Sun disk
-    cr.setSourceRGBA(1, 1, 1, 0.95);
-    cr.arc(sunX, sunY, sunR, 0, Math.PI * 2);
-    cr.fill();
-
-    // Sun disk warm center
-    const disk = new Cairo.RadialGradient(sunX - sunR * 0.2, sunY - sunR * 0.2, 0,
+    // Sun disk — slightly warm centre, subtly cooler edge (real solar disc effect)
+    const disk = new Cairo.RadialGradient(sunX - sunR * 0.15, sunY - sunR * 0.15, 0,
         sunX, sunY, sunR);
-    disk.addColorStopRGBA(0, 1, 1, 1, 1);
-    disk.addColorStopRGBA(0.5, sc[0], sc[1], sc[2], 0.8);
-    disk.addColorStopRGBA(1, sc[0], sc[1], sc[2], 0.3);
+    disk.addColorStopRGBA(0, 1, 1, 0.96, 1);
+    disk.addColorStopRGBA(0.35, 1, 0.98, 0.90, 0.98);
+    disk.addColorStopRGBA(0.75, sc[0], sc[1], sc[2], 0.85);
+    disk.addColorStopRGBA(0.9, sc[0], sc[1], sc[2], 0.6);
+    disk.addColorStopRGBA(1, sc[0], sc[1], sc[2], 0.15);
     cr.setSource(disk);
     cr.arc(sunX, sunY, sunR, 0, Math.PI * 2);
     cr.fill();
@@ -401,36 +410,43 @@ Renderer.prototype._drawSunMoon = function (cr, w, h, scene) {
  * @returns {void}
  */
 Renderer.prototype._drawMoon = function (cr, x, y, r, scene) {
-    // Moon glow
-    const glowR = r * 4;
-    const glow = new Cairo.RadialGradient(x, y, r * 0.3, x, y, glowR);
-    glow.addColorStopRGBA(0, 0.6, 0.7, 1.0, 0.15);
-    glow.addColorStopRGBA(0.4, 0.5, 0.6, 0.9, 0.06);
-    glow.addColorStopRGBA(1, 0.4, 0.5, 0.8, 0);
+    // Moon glow — soft silvery-blue atmospheric halo
+    const glowR = r * 4.5;
+    const glow = new Cairo.RadialGradient(x, y, r * 0.25, x, y, glowR);
+    glow.addColorStopRGBA(0, 0.75, 0.80, 1.0, 0.18);
+    glow.addColorStopRGBA(0.3, 0.60, 0.68, 0.95, 0.08);
+    glow.addColorStopRGBA(0.65, 0.35, 0.45, 0.80, 0.02);
+    glow.addColorStopRGBA(1, 0.20, 0.28, 0.60, 0);
     cr.setSource(glow);
     cr.rectangle(0, 0, this._d._width, this._d._height);
     cr.fill();
 
-    // Moon disk
-    cr.setSourceRGBA(0.92, 0.93, 0.98, 0.9);
+    // Moon disk — soft silvery white with subtle cool tint
+    cr.setSourceRGBA(0.96, 0.97, 1.0, 0.88);
     cr.arc(x, y, r, 0, Math.PI * 2);
     cr.fill();
 
-    // Moon phase (crescent effect using shadow circle)
+    // Moon phase (softer crescent using a radial gradient shadow)
     const phase = scene.moonPhase || 0;
     // phase 0 = new moon, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter
-    // Map to shadow offset: 0→-2r (full shadow = new moon), 0.5→0 (no shadow = full)
     if (Math.abs(phase - 0.5) > 0.02) {
         let shadowOffset;
         if (phase < 0.5) {
-            // Waxing: shadow on left
-            shadowOffset = -r * 2 * (1 - phase * 2);
+            shadowOffset = -r * 1.5 * (1 - phase * 2);
         } else {
-            // Waning: shadow on right
-            shadowOffset = r * 2 * (phase - 0.5) * 2;
+            shadowOffset = r * 1.5 * (phase - 0.5) * 2;
         }
-        cr.setSourceRGBA(0.05, 0.05, 0.12, 0.85);
-        cr.arc(x + shadowOffset, y, r * 1.02, 0, Math.PI * 2);
+        // Use a radial gradient centred on the shadow offset for a soft terminator
+        const shadow = new Cairo.RadialGradient(
+            x + shadowOffset, y, r * 0.2,
+            x + shadowOffset, y, r * 1.4
+        );
+        shadow.addColorStopRGBA(0, 0.05, 0.05, 0.12, 0.92);
+        shadow.addColorStopRGBA(0.35, 0.05, 0.05, 0.12, 0.55);
+        shadow.addColorStopRGBA(0.7, 0.05, 0.05, 0.12, 0.12);
+        shadow.addColorStopRGBA(1, 0.05, 0.05, 0.12, 0);
+        cr.setSource(shadow);
+        cr.arc(x, y, r * 1.02, 0, Math.PI * 2);
         cr.fill();
     }
 
@@ -488,28 +504,41 @@ Renderer.prototype._drawCloudLayer = function (cr, w, h, scene, layer) {
     const mask = this._getCloudMask(noiseTex, density, layer);
     if (!mask) return;
 
-    // Build cloud color: white/grey with slight blue or warm tint based on scene
+    // Build cloud color: base white/grey tinted by sky colors for atmospheric integration
     const isNight = scene.isNight;
+    const skyTop = scene.skyTopColor;
+    const skyBot = scene.skyBottomColor;
+
     let col;
     if (isNight) {
-        col = [0.15, 0.15, 0.20]; // dark clouds at night
+        // Dark clouds at night, slightly picking up moonlight blue
+        col = [0.18, 0.18, 0.24];
     } else if (scene.precipitationType === 'rain' || scene.precipitationType === 'thunder' || scene.precipitationType === 'hail') {
-        col = [0.35, 0.38, 0.45]; // rainy grey
+        col = [0.42, 0.45, 0.52];
     } else if (scene.precipitationType === 'snow') {
-        col = [0.55, 0.58, 0.65]; // snowy grey
+        col = [0.62, 0.65, 0.72];
     } else if (scene.sunElevation > 0 && scene.sunElevation < 20) {
-        // Sunset: warm clouds
+        // Sunset: warm clouds — tint with sky bottom color
         const sf = (20 - scene.sunElevation) / 20;
-        col = [0.8 + sf * 0.2, 0.6 + sf * 0.1, 0.5 - sf * 0.2];
+        col = [0.85 + sf * 0.12, 0.62 + sf * 0.15, 0.48 - sf * 0.18];
     } else {
-        col = [0.75, 0.78, 0.85]; // default white-grey
+        // Default white-grey with subtle sky blue influence
+        col = [0.78, 0.82, 0.88];
     }
 
-    // Apply scene ambient light to cloud color
+    // Apply scene ambient light and blend with sky color
     const amb = scene.ambientLight;
-    col[0] *= amb[0];
-    col[1] *= amb[1];
-    col[2] *= amb[2];
+    col[0] = col[0] * 0.7 + skyTop[0] * 0.3;
+    col[1] = col[1] * 0.7 + skyTop[1] * 0.3;
+    col[2] = col[2] * 0.7 + skyTop[2] * 0.3;
+    col[0] *= amb[0] * 0.85 + 0.15;
+    col[1] *= amb[1] * 0.85 + 0.15;
+    col[2] *= amb[2] * 0.85 + 0.15;
+
+    // Clamp
+    col[0] = Math.max(0, Math.min(1, col[0]));
+    col[1] = Math.max(0, Math.min(1, col[1]));
+    col[2] = Math.max(0, Math.min(1, col[2]));
 
     cr.save();
 
@@ -809,7 +838,7 @@ Renderer.prototype._drawGlassPanel = function (cr, w, h, scene) {
     const isDark = this._themeColors().isDark;
 
     const o = (d.opacity || 70) / 100;
-    const pad = 20, r = 20;
+    const pad = 20, r = 24;
     const pH = h - pad * 2, pY = pad;
 
     // ── Scene-adaptive tint ──
@@ -818,9 +847,14 @@ Renderer.prototype._drawGlassPanel = function (cr, w, h, scene) {
         tint = scene.panelTint;
     }
 
-    // Shadow
-    cr.setSourceRGBA(0, 0, 0, 0.2 * o);
-    this._roundRect(cr, pad + 2, pY + 2, w - pad * 2 - 4, pH - 4, r);
+    // Shadow — softer, wider spread for realistic depth
+    cr.setSourceRGBA(0, 0, 0, 0.12 * o);
+    this._roundRect(cr, pad + 1, pY + 2, w - pad * 2 - 2, pH - 2, r);
+    cr.fill();
+
+    // Inner shadow / rim highlight — etched glass edge effect
+    cr.setSourceRGBA(0, 0, 0, 0.08 * o);
+    this._roundRect(cr, pad + 1, pY + 1, w - pad * 2 - 2, pH - 2, r);
     cr.fill();
 
     // Main glass fill with scene tint
@@ -836,37 +870,66 @@ Renderer.prototype._drawGlassPanel = function (cr, w, h, scene) {
     ];
 
     if (isDark) {
-        cr.setSourceRGBA(glassDark[0], glassDark[1], glassDark[2], 0.75 * o);
+        cr.setSourceRGBA(glassDark[0], glassDark[1], glassDark[2], 0.72 * o);
     } else {
         cr.setSourceRGBA(
             Math.min(1, glassLight[0]),
             Math.min(1, glassLight[1]),
             Math.min(1, glassLight[2]),
-            0.12 * o
+            0.10 * o
         );
     }
     this._roundRect(cr, pad, pY, w - pad * 2, pH, r);
     cr.fill();
 
+    // Subtle glass depth gradient (top-to-bottom light attenuation)
+    const glassGrad = new Cairo.LinearGradient(0, pad, 0, pad + pH);
+    if (isDark) {
+        glassGrad.addColorStopRGBA(0, 0, 0, 0, 0);
+        glassGrad.addColorStopRGBA(0.6, 0, 0, 0, 0);
+        glassGrad.addColorStopRGBA(1, 0, 0, 0, 0.06 * o);
+    } else {
+        glassGrad.addColorStopRGBA(0, 1, 1, 1, 0.03 * o);
+        glassGrad.addColorStopRGBA(0.4, 1, 1, 1, 0);
+        glassGrad.addColorStopRGBA(0.7, 0, 0, 0, 0);
+        glassGrad.addColorStopRGBA(1, 0, 0, 0, 0.04 * o);
+    }
+    cr.setSource(glassGrad);
+    this._roundRect(cr, pad, pY, w - pad * 2, pH, r);
+    cr.fill();
+
     // Border with scene-tinted color
     const border = isDark
-        ? [0.392 * tint[0], 0.549 * tint[1], 1.0 * tint[2]]
+        ? [0.35 * tint[0], 0.52 * tint[1], 1.0 * tint[2]]
         : [1.0 * tint[0], 1.0 * tint[1], 1.0 * tint[2]];
 
-    cr.setLineWidth(1.5);
+    cr.setLineWidth(1.2);
     cr.setSourceRGBA(
         Math.min(1, border[0]),
         Math.min(1, border[1]),
         Math.min(1, border[2]),
-        (isDark ? 0.15 : 0.25) * o
+        (isDark ? 0.12 : 0.18) * o
     );
     this._roundRect(cr, pad, pY, w - pad * 2, pH, r);
     cr.stroke();
 
-    // Light reflection on glass (light theme only)
+    // Top rim light reflection — realistic glass edge catch
     if (!isDark) {
-        cr.setSourceRGBA(1, 1, 1, 0.06 * o);
-        this._roundRect(cr, pad, pY, w - pad * 2, pH * 0.15, r);
+        const rimGrad = new Cairo.LinearGradient(0, pad - 1, 0, pad + 8);
+        rimGrad.addColorStopRGBA(0, 1, 1, 1, 0);
+        rimGrad.addColorStopRGBA(0.35, 1, 1, 1, 0.09 * o);
+        rimGrad.addColorStopRGBA(1, 1, 1, 1, 0);
+        cr.setSource(rimGrad);
+        cr.rectangle(pad + r, pad, w - pad * 2 - r * 2, 8);
+        cr.fill();
+    } else {
+        // Subtle dark glass rim catch
+        const rimGrad = new Cairo.LinearGradient(0, pad - 1, 0, pad + 6);
+        rimGrad.addColorStopRGBA(0, 0.5, 0.5, 1.0, 0);
+        rimGrad.addColorStopRGBA(0.4, 0.5, 0.5, 1.0, 0.04 * o);
+        rimGrad.addColorStopRGBA(1, 0.5, 0.5, 1.0, 0);
+        cr.setSource(rimGrad);
+        cr.rectangle(pad + r, pad, w - pad * 2 - r * 2, 6);
         cr.fill();
     }
 };
@@ -912,15 +975,30 @@ Renderer.prototype._drawLightning = function (cr, w, h, scene) {
     }
 
     if (this._lightningAlpha > 0.01) {
-        // Full-screen white flash with slight blue tint
         const a = this._lightningAlpha;
-        cr.setSourceRGBA(1, 1, 1, a * 0.15);
+
+        // Use a deterministic pseudo-random hotspot for consistency within a strike
+        const seed = Math.floor(this._lightningTimer * 100) % 100;
+        const hotX = w * (0.2 + (seed % 7) * 0.1);
+        const hotY = h * (0.15 + (seed % 5) * 0.1);
+
+        // Radial flash from hotspot — simulates the bright core of a lightning strike
+        const flash = new Cairo.RadialGradient(hotX, hotY, w * 0.02, hotX, hotY, Math.max(w, h) * 0.9);
+        flash.addColorStopRGBA(0, 1, 1, 1, a * 0.22);
+        flash.addColorStopRGBA(0.25, 0.95, 0.95, 1.0, a * 0.10);
+        flash.addColorStopRGBA(0.6, 0.85, 0.88, 1.0, a * 0.03);
+        flash.addColorStopRGBA(1, 0.5, 0.55, 0.8, 0);
+        cr.setSource(flash);
         cr.rectangle(0, 0, w, h);
         cr.fill();
 
-        // Secondary flash (slightly stronger, shorter)
+        // Secondary crisp flash (brief bright core)
         if (a > 0.3) {
-            cr.setSourceRGBA(0.9, 0.9, 1.0, a * 0.08);
+            const flash2 = new Cairo.RadialGradient(hotX, hotY, w * 0.005, hotX, hotY, w * 0.35);
+            flash2.addColorStopRGBA(0, 1, 1, 1, a * 0.12);
+            flash2.addColorStopRGBA(0.4, 0.9, 0.92, 1.0, a * 0.04);
+            flash2.addColorStopRGBA(1, 0.7, 0.75, 0.95, 0);
+            cr.setSource(flash2);
             cr.rectangle(0, 0, w, h);
             cr.fill();
         }
@@ -1016,7 +1094,7 @@ Renderer.prototype._drawWeather = function (cr, w) {
     const temp = Math.round(wd.main.temp), feels = Math.round(wd.main.feels_like);
     const hum = Math.round(wd.main.humidity), wind = Math.round(wd.wind.speed);
     const unit = d.units === 'metric' ? '\u00B0C' : '\u00B0F';
-    const cx = w / 2, topY = 45;
+    const cx = w / 2, topY = 55;
 
     cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 1);
     this._cpango(cr, temp + unit, cx, topY + 30, 54, true);
@@ -1042,8 +1120,15 @@ Renderer.prototype._drawWeather = function (cr, w) {
             this._cpango(cr, detailItems[i].lbl, ix, detailY + 37, 10, false);
         }
     }
-    cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.6);
-    this._cpango(cr, wd.name + ', ' + (wd.sys.country || ''), cx, topY + 160, 13, false);
+    // ── Current date and time (one line) ──
+    const locale = (this._d.language || 'en') === 'ru' ? 'ru-RU' : 'en-US';
+    const now = new Date();
+    const dtStr = now.toLocaleString(locale, {
+        day: 'numeric', month: 'long',
+        hour: '2-digit', minute: '2-digit'
+    });
+    cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.85);
+    this._cpango(cr, dtStr, cx, topY + 190, 14, true);
 };
 
 /* ── Forecast display ────────────────────────────────────────────────────── */

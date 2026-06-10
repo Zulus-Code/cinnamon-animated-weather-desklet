@@ -142,6 +142,8 @@ Particle.prototype._init = function (type) {
 function ParticleSystem() {
     this.particles = [];
     this._time = 0;
+    // Ambient light for natural color integration (set externally)
+    this.ambientLight = [1, 1, 1];
 }
 
 /**
@@ -428,10 +430,11 @@ ParticleSystem.prototype.draw = function (cr) {
  * @returns {void}
  */
 ParticleSystem.prototype._drawRain = function (cr, p) {
-    // Color: slightly blue, more opaque near
-    const r = 0.55 + p.depth * 0.25;
-    const g = 0.65 + p.depth * 0.25;
-    const b = 0.85 + p.depth * 0.15;
+    // Color: cool blue-white, picking up ambient sky tone
+    const amb = this.ambientLight;
+    const r = (0.58 + p.depth * 0.22) * amb[0];
+    const g = (0.68 + p.depth * 0.22) * amb[1];
+    const b = (0.88 + p.depth * 0.12) * amb[2];
 
     // Streak length based on depth
     const streakLen = p._streakLen || (0.02 + p.depth * 0.04);
@@ -469,8 +472,14 @@ ParticleSystem.prototype._drawSnow = function (cr, p) {
     const alpha = p.alpha * (0.6 + 0.4 * (0.5 + 0.5 * Math.sin(this._time * 2 + p.wobbleOffset)));
     const s = p.size * 0.5;
     const angle = p._rotationAngle || 0;
+    const amb = this.ambientLight;
 
-    cr.setSourceRGBA(1, 1, 1, alpha);
+    // Snow: mostly white with subtle blue-amber variation from ambient light
+    const sr = Math.min(1, 0.98 * amb[0]);
+    const sg = Math.min(1, 0.97 * amb[1]);
+    const sb = Math.min(1, 1.0 * amb[2]);
+
+    cr.setSourceRGBA(sr, sg, sb, alpha);
 
     // Draw snowflake as a small circle with subtle hexagonal hint
     if (s > 3) {
@@ -484,7 +493,7 @@ ParticleSystem.prototype._drawSnow = function (cr, p) {
 
         // 6-pointed star (simplified snowflake)
         cr.setLineWidth(s * 0.2);
-        cr.setSourceRGBA(1, 1, 1, alpha * 0.5);
+        cr.setSourceRGBA(sr, sg, sb, alpha * 0.5);
         for (let arm = 0; arm < 6; arm++) {
             const a = arm * Math.PI / 3;
             cr.moveTo(0, 0);
@@ -505,7 +514,7 @@ ParticleSystem.prototype._drawSnow = function (cr, p) {
         }
 
         // Outer glow
-        cr.setSourceRGBA(1, 1, 1, alpha * 0.08);
+        cr.setSourceRGBA(sr, sg, sb, alpha * 0.08);
         cr.arc(0, 0, s * 2, 0, Math.PI * 2);
         cr.fill();
     } else {
@@ -514,7 +523,7 @@ ParticleSystem.prototype._drawSnow = function (cr, p) {
         cr.fill();
 
         // Faint glow
-        cr.setSourceRGBA(1, 1, 1, alpha * 0.05);
+        cr.setSourceRGBA(sr, sg, sb, alpha * 0.05);
         cr.arc(p.x, p.y, s * 2, 0, Math.PI * 2);
         cr.fill();
     }
@@ -556,9 +565,14 @@ ParticleSystem.prototype._drawStar = function (cr, p) {
 ParticleSystem.prototype._drawHail = function (cr, p) {
     const s = p.size * 0.5;
     const angle = p._rotationAngle || 0;
+    const amb = this.ambientLight;
 
-    // Hail is white/icy with a slight blue tint
-    cr.setSourceRGBA(0.85, 0.9, 1.0, p.alpha * 0.8);
+    // Hail is white/icy with a slight blue tint, picking up ambient light
+    const hr = 0.85 * amb[0];
+    const hg = 0.90 * amb[1];
+    const hb = 1.0 * amb[2];
+
+    cr.setSourceRGBA(hr, hg, hb, p.alpha * 0.8);
 
     // Small hail: simple circle
     if (s < 2) {
@@ -573,7 +587,7 @@ ParticleSystem.prototype._drawHail = function (cr, p) {
     cr.rotate(angle);
 
     // Main icy ball
-    cr.setSourceRGBA(0.8, 0.85, 0.98, p.alpha * 0.85);
+    cr.setSourceRGBA(0.78 * amb[0], 0.83 * amb[1], 0.96 * amb[2], p.alpha * 0.85);
     cr.arc(0, 0, s, 0, Math.PI * 2);
     cr.fill();
 
