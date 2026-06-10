@@ -49,4 +49,16 @@ export default [
             'brace-style': ['warn', '1tbs', { allowSingleLine: true }],
         },
     },
+    {
+        // Test files — Node.js globals
+        files: ['tests/**/*.js'],
+        languageOptions: {
+            globals: {
+                require: 'readonly',
+                module: 'readonly',
+                __dirname: 'readonly',
+                process: 'readonly',
+            },
+        },
+    },
 ];

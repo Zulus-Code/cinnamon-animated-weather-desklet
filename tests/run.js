@@ -18,7 +18,7 @@ console.log();
 
 let totalPassed = 0;
 let totalFailed = 0;
-let allErrors = [];
+const allErrors = [];
 
 for (const suite of SUITES) {
     try {

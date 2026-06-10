@@ -390,7 +390,7 @@ SceneBuilder.prototype._updateSceneTarget = function (weatherData,
     t.moonElevation = moonEl;
     t.moonVisible = moonVis;
     t.moonIllumination = moonIllum;
-
+    t.moonPhase = ((new Date().getDate() - 1) % 29.53) / 29.53;
     // Time of day as continuous 0-1 value (0=midnight)
     const now = new Date();
     const curMin = now.getHours() * 60 + now.getMinutes();

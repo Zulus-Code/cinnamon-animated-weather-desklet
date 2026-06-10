@@ -17,7 +17,7 @@ function _iconNum(owmId) {
 
 // ── Mock utilities (simulating Utils._dayName and Utils.wmoToOwmId) ──
 
-function _mockDayName(date, lang) {
+function _mockDayName(date, _lang) {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     return days[date.getDay()] || '';
 }
@@ -87,7 +87,7 @@ function futureDateStr(daysFromNow) {
 
 let passed = 0;
 let failed = 0;
-let errors = [];
+const errors = [];
 
 function test(name, fn) {
     try {

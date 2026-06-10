@@ -248,7 +248,7 @@ WeatherService.prototype.fetchWeather = function (lat, lon, name, country, units
             onSuccess({
                 weather: weatherData,
                 forecast: self._buildForecastFromHourly(hourly, daily),
-                dailyForecast: self._buildDailyForecast(daily),
+                dailyForecast: self._buildDailyForecast(daily, self._lang),
                 sunriseMinutes: sunrise,
                 sunsetMinutes: sunset
             });
@@ -300,9 +300,10 @@ WeatherService.prototype._buildForecastFromHourly = function (hourly, daily) {
  * @param {Object} daily - Open-Meteo daily data object
  * @returns {Array|null} Array of daily forecast items, or null if no data
  */
-WeatherService.prototype._buildDailyForecast = function (daily) {
+WeatherService.prototype._buildDailyForecast = function (daily, lang) {
     if (!daily || !daily.time || !daily.temperature_2m_max) return null;
 
+    lang = lang || 'en';
     const list = [];
     const now = new Date();
     const todayDate = now.getDate();
@@ -315,7 +316,7 @@ WeatherService.prototype._buildDailyForecast = function (daily) {
         // Skip today's date (already shown as current weather) — show from tomorrow
         if (dDate === todayDate) continue;
 
-        const dayLabel = Utils._dayName(dt, this._lang || 'en');
+        const dayLabel = Utils._dayName(dt, lang);
         const owmId = Utils.wmoToOwmId(daily.weather_code[i]);
         const isNight = false;
 

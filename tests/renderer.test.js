@@ -65,7 +65,7 @@ function _themeColors(theme, isNight) {
 
 let passed = 0;
 let failed = 0;
-let errors = [];
+const errors = [];
 
 function test(name, fn) {
     try {

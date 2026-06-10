@@ -164,7 +164,7 @@ Renderer.prototype.draw = function (area) {
     // ── Rainbow — drawn when conditions are right ──
     try {
         const scene = d._scene || null;
-        if (scene && d.showBackground !== false) {
+        if (scene) {
             this._drawRainbow(cr, w, h, scene);
         }
     } catch (e) { global.logError('Draw rainbow error: ' + e); }

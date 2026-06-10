@@ -129,7 +129,7 @@ const WMO_DESCRIPTIONS = {
 
 let passed = 0;
 let failed = 0;
-let errors = [];
+const errors = [];
 
 function test(name, fn) {
     try {
