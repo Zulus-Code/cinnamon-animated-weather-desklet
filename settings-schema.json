@@ -107,5 +107,44 @@
         "units": "px",
         "step": 10,
         "description": "Desklet width"
+    },
+    "__debug__": {
+        "type": "section",
+        "description": "🧪 Test"
+    },
+    "debug-mode": {
+        "type": "switch",
+        "default": false,
+        "description": "Override weather for testing"
+    },
+    "debug-weather-type": {
+        "type": "combobox",
+        "default": "0",
+        "description": "Test condition",
+        "options": {
+            "0": "☀️ Clear",
+            "45": "🌫️ Fog",
+            "51": "🌦️ Drizzle",
+            "61": "🌧️ Rain",
+            "71": "❄️ Snow",
+            "95": "⛈️ Thunderstorm"
+        },
+        "dependency": "debug-mode"
+    },
+    "debug-cloud-cover": {
+        "type": "spinbutton",
+        "default": 50,
+        "min": 0,
+        "max": 100,
+        "units": "%",
+        "step": 10,
+        "description": "Cloud cover",
+        "dependency": "debug-mode"
+    },
+    "debug-night": {
+        "type": "switch",
+        "default": false,
+        "description": "Force night mode",
+        "dependency": "debug-mode"
     }
 }
