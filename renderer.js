@@ -11,7 +11,6 @@ const PangoCairo = imports.gi.PangoCairo;
 const Cairo = imports.cairo;
 
 const Constants = imports.constants;
-const Utils = imports.utils;
 
 /* ── Renderer constructor ────────────────────────────────────────────────── */
 
@@ -236,14 +235,25 @@ Renderer.prototype._drawSimpleFallback = function (cr, w, h) {
     const stormyTop = [0.08, 0.10, 0.16], stormyBot = [0.14, 0.16, 0.22];
     const foggyTop = [0.55, 0.60, 0.68], foggyBot = [0.65, 0.70, 0.78];
 
+    const wid = this._d._weather ? this._d._weather.weather[0].id : 800;
+    const night = this._d._isNight ? this._d._isNight() : false;
+
     let top, bot;
-    if (wid >= 200 && wid < 300) { top = stormyTop; bot = stormyBot; }
-    else if (wid >= 300 && wid < 600) { top = night ? rainyNightTop : rainyDayTop; bot = night ? rainyNightBot : rainyDayBot; }
-    else if (wid >= 600 && wid < 700) { top = night ? snowyNightTop : snowyDayTop; bot = night ? snowyNightBot : snowyDayBot; }
-    else if (wid >= 700 && wid < 800) { top = foggyTop; bot = foggyBot; }
-    else if (wid === 800) { top = night ? nightTop : dayTop; bot = night ? nightBot : dayBot; }
-    else if (wid >= 801) { top = night ? cloudyNightTop : cloudyDayTop; bot = night ? cloudyNightBot : cloudyDayBot; }
-    else { top = stormyTop; bot = cloudyDayBot; }
+    if (wid >= 200 && wid < 300) {
+        top = stormyTop; bot = stormyBot;
+    } else if (wid >= 300 && wid < 600) {
+        top = night ? rainyNightTop : rainyDayTop; bot = night ? rainyNightBot : rainyDayBot;
+    } else if (wid >= 600 && wid < 700) {
+        top = night ? snowyNightTop : snowyDayTop; bot = night ? snowyNightBot : snowyDayBot;
+    } else if (wid >= 700 && wid < 800) {
+        top = foggyTop; bot = foggyBot;
+    } else if (wid === 800) {
+        top = night ? nightTop : dayTop; bot = night ? nightBot : dayBot;
+    } else if (wid >= 801) {
+        top = night ? cloudyNightTop : cloudyDayTop; bot = night ? cloudyNightBot : cloudyDayBot;
+    } else {
+        top = stormyTop; bot = cloudyDayBot;
+    }
 
     const pat = new Cairo.LinearGradient(0, 0, 0, h);
     pat.addColorStopRGBA(0, top[0], top[1], top[2], 1);
@@ -507,8 +517,6 @@ Renderer.prototype._drawCloudLayer = function (cr, w, h, scene, layer) {
     // Build cloud color: base white/grey tinted by sky colors for atmospheric integration
     const isNight = scene.isNight;
     const skyTop = scene.skyTopColor;
-    const skyBot = scene.skyBottomColor;
-
     let col;
     if (isNight) {
         // Dark clouds at night, slightly picking up moonlight blue

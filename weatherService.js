@@ -1,5 +1,5 @@
 /**
- * @file weatherService.js — Open-Meteo API client for weather-animated@zulus
+ * @file weatherService.js — Weather API client for weather-animated@zulus
  * @module weatherService
  */
 
@@ -155,31 +155,38 @@ function _iconNum(owmId) {
  * Resolve a location name to lat/lon coordinates, or auto-detect via IP.
  * @param {string} location - Location name or 'auto' for IP-based detection
  * @param {string} language - Language code ('en' or 'ru')
- * @param {Function} onSuccess - Callback on success, receives (lat, lon, name, countryCode)
+ * @param {Function} onSuccess - Callback on success, receives (lat, lon, name, countryCode, elevation)
  * @param {Function} onError - Callback on error, receives error object
  * @returns {void}
  */
 WeatherService.prototype.resolveLocation = function (location, language, onSuccess, onError) {
     if (location && location !== 'auto') {
+        const parts = location.split(',');
+        if (parts.length === 2) {
+            const lat = parseFloat(parts[0]), lon = parseFloat(parts[1]);
+            if (!isNaN(lat) && !isNaN(lon)) { onSuccess(lat, lon, location, '', null); return; }
+        }
+
         const url = 'https://geocoding-api.open-meteo.com/v1/search?name='
             + GLib.uri_escape_string(location, null, true)
-            + '&count=1&language=' + (language === 'ru' ? 'ru' : 'en') + '&format=json';
+            + '&count=10&language=' + (language === 'ru' ? 'ru' : 'en') + '&format=json';
 
         this._httpGet(url, function (data) {
             try {
                 const json = JSON.parse(data);
                 if (json.results && json.results.length > 0) {
-                    const r = json.results[0];
-                    onSuccess(r.latitude, r.longitude, r.name || location, r.country || r.country_code || '');
+                    const wantedCountry = (location.match(/,\s*([A-Za-z]{2})\s*$/) || [])[1];
+                    let r = json.results[0];
+                    if (wantedCountry) {
+                        const cc = wantedCountry.toUpperCase();
+                        for (let i = 0; i < json.results.length; i++) {
+                            if ((json.results[i].country_code || '').toUpperCase() === cc) { r = json.results[i]; break; }
+                        }
+                    }
+                    onSuccess(r.latitude, r.longitude, r.name || location, r.country || r.country_code || '', r.elevation);
                     return;
                 }
             } catch (e) {}
-            // fallback: try as lat,lon pair
-            const parts = location.split(',');
-            if (parts.length === 2) {
-                const lat = parseFloat(parts[0]), lon = parseFloat(parts[1]);
-                if (!isNaN(lat) && !isNaN(lon)) { onSuccess(lat, lon, location, ''); return; }
-            }
             onError({ key: 'resolve_err', detail: location });
         }, function (err) { onError({ key: 'resolve_err', detail: err }); });
     } else {
@@ -189,11 +196,11 @@ WeatherService.prototype.resolveLocation = function (location, language, onSucce
                 try {
                     const json = JSON.parse(data);
                     const city = json.city || '', country = json.countryCode || '', lat = json.lat, lon = json.lon;
-                    if (city && lat !== undefined && lon !== undefined) { onSuccess(lat, lon, city, country); return; }
+                    if (city && lat !== undefined && lon !== undefined) { onSuccess(lat, lon, city, country, null); return; }
                 } catch (e) {}
-                onSuccess(55.75, 37.62, 'Moscow', 'RU');
+                onSuccess(55.75, 37.62, 'Moscow', 'RU', 155);
             },
-            function () { onSuccess(55.75, 37.62, 'Moscow', 'RU'); }
+            function () { onSuccess(55.75, 37.62, 'Moscow', 'RU', 155); }
         );
     }
 };
@@ -206,18 +213,27 @@ WeatherService.prototype.resolveLocation = function (location, language, onSucce
  * @param {number} lon - Longitude
  * @param {string} name - Location name
  * @param {string} country - Country code
+ * @param {number|null} elevation - Ground elevation in meters, if known
  * @param {string} units - Unit system ('metric' or 'imperial')
  * @param {string} language - Language code ('en' or 'ru')
  * @param {Function} onSuccess - Callback on success, receives weather data object
  * @param {Function} onError - Callback on error, receives error object
  * @returns {void}
  */
-WeatherService.prototype.fetchWeather = function (lat, lon, name, country, units, language, onSuccess, onError) {
+WeatherService.prototype.fetchWeather = function (lat, lon, name, country, elevation, units, language, onSuccess, onError) {
     const self = this;
     this._lang = language || 'en';
 
+    if (typeof elevation === 'string' && (elevation === 'metric' || elevation === 'imperial')) {
+        onError = onSuccess;
+        onSuccess = language;
+        language = units;
+        units = elevation;
+        elevation = null;
+    }
+
     if (this._provider === 'met-norway') {
-        this._fetchMetNorway(lat, lon, name, country, units, language, onSuccess, onError);
+        this._fetchMetNorway(lat, lon, name, country, elevation, units, language, onSuccess, onError);
         return;
     }
 
@@ -281,7 +297,15 @@ WeatherService.prototype.fetchWeather = function (lat, lon, name, country, units
                 sunsetMinutes: sunset
             });
         } catch (e) { onError({ key: 'parse_err', detail: e.toString().slice(0, 60) }); }
-    }, function (err) { onError({ key: 'api_err', detail: err }); });
+    }, function (err) {
+        self._fetchMetNorway(lat, lon, name, country, elevation, units, language, function (data) {
+            data.fallbackProvider = 'met-norway';
+            data.fallbackReason = 'Open-Meteo: ' + err;
+            onSuccess(data);
+        }, function (fallbackErr) {
+            onError({ key: 'api_err', detail: 'Open-Meteo unavailable: ' + err + '; MET Norway fallback failed: ' + (fallbackErr.detail || fallbackErr) });
+        });
+    });
 };
 
 /* ── Build forecast list from Open-Meteo hourly arrays ───────────────────── */
@@ -426,15 +450,19 @@ WeatherService.prototype._getMetNorwaySunrise = function (lat, lon, onResult) {
  * @param {number} lon - Longitude
  * @param {string} name - Location name
  * @param {string} country - Country code
+ * @param {number|null} elevation - Ground elevation in meters, if known
  * @param {string} units - Unit system ('metric' or 'imperial')
  * @param {string} language - Language code
  * @param {Function} onSuccess - Callback on success
  * @param {Function} onError - Callback on error
  * @returns {void}
  */
-WeatherService.prototype._fetchMetNorway = function (lat, lon, name, country, units, language, onSuccess, onError) {
+WeatherService.prototype._fetchMetNorway = function (lat, lon, name, country, elevation, units, language, onSuccess, onError) {
     const self = this;
-    const url = 'https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + lat + '&lon=' + lon;
+    let url = 'https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + lat + '&lon=' + lon;
+    if (elevation !== null && elevation !== undefined && !isNaN(parseFloat(elevation))) {
+        url += '&altitude=' + Math.round(parseFloat(elevation));
+    }
 
     this._httpGet(url, function (data) {
         try {
@@ -445,8 +473,6 @@ WeatherService.prototype._fetchMetNorway = function (lat, lon, name, country, un
             }
 
             const timeseries = json.properties.timeseries;
-            const meta = json.properties.meta || {};
-
             // Find the closest time point to now
             const now = Date.now();
             let closest = timeseries[0];
@@ -471,7 +497,7 @@ WeatherService.prototype._fetchMetNorway = function (lat, lon, name, country, un
             const icon = _iconNum(owmId) + (parsed.isNight ? 'n' : 'd');
 
             // Temperature
-            let temp = inst.air_temperature;
+            const temp = inst.air_temperature;
             let feels = inst.air_temperature;
             // Wind chill approximation when windy
             if (inst.wind_speed > 2) {

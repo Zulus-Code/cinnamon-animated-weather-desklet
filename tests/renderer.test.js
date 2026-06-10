@@ -221,7 +221,7 @@ test('_formatDateTime ru contains Russian month name', () => {
     const s = _formatDateTime('ru');
     // Should contain a month name in Russian (января, февраля, ...)
     const ruMonths = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-                      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+        'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
     const hasRuMonth = ruMonths.some(m => s.includes(m));
     assert.ok(hasRuMonth, 'ru date string "' + s + '" should contain a Russian month');
 });
@@ -229,7 +229,7 @@ test('_formatDateTime ru contains Russian month name', () => {
 test('_formatDateTime en contains English month name', () => {
     const s = _formatDateTime('en');
     const enMonths = ['January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December'];
+        'July', 'August', 'September', 'October', 'November', 'December'];
     const hasEnMonth = enMonths.some(m => s.includes(m));
     assert.ok(hasEnMonth, 'en date string "' + s + '" should contain an English month');
 });

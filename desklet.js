@@ -198,11 +198,15 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
 
         this._setContainerTransparent(this.showBackground === false);
 
-        // Refresh weather only when location or units actually changed (Fix #3)
+        // Refresh weather only when data-affecting settings changed (Fix #3)
         const locationChanged = (this._lastLocation !== this.location) ||
-                              (this._lastUnits !== this.units);
+                              (this._lastUnits !== this.units) ||
+                              (this._lastApiProvider !== this.apiProvider) ||
+                              (this._lastLanguage !== this.language);
         this._lastLocation = this.location;
         this._lastUnits = this.units;
+        this._lastApiProvider = this.apiProvider;
+        this._lastLanguage = this.language;
 
         if (locationChanged) {
             this._skipParticleInit = true; // _onWeatherLoaded will handle init (Fix #2)
@@ -240,10 +244,11 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this._weatherService.resolveLocation(
             this.location,
             this.language,
-            Lang.bind(this, function (lat, lon, name, country) {
+            Lang.bind(this, function (lat, lon, name, country, elevation) {
                 this._weatherService._provider = this.apiProvider || 'met-norway';
                 this._weatherService.fetchWeather(
                     lat, lon, name, country,
+                    elevation,
                     this.units, this.language,
                     Lang.bind(this, this._onWeatherLoaded),
                     Lang.bind(this, this._onWeatherError)
