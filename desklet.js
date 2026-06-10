@@ -10,6 +10,7 @@
 
 const Lang = imports.lang;
 const Mainloop = imports.mainloop;
+const St = imports.gi.St;
 const Settings = imports.ui.settings;
 const UUID = 'weather-animated@zulus';
 
