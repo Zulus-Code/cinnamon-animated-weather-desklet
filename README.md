@@ -27,18 +27,25 @@ A beautiful, real-time animated weather desklet for Linux Mint Cinnamon desktop.
 - **Linux Mint 20+** (or any Cinnamon desktop ≥ 4.6)
 - **Internet connection** (for weather data)
 
-### Install
+### Quick Install
+
+Choose any method:
 
 ```bash
-# Clone and install in one go
-git clone https://github.com/Zulus-Code/cinnamon-animated-weather-desklet.git \
-  ~/.local/share/cinnamon/desklets/weather-animated@zulus/
+# 🥇 Recommended — Makefile (clone once, keeps git for easy updates)
+git clone https://github.com/Zulus-Code/cinnamon-animated-weather-desklet.git
+cd cinnamon-animated-weather-desklet
+make install
 
-# Restart Cinnamon
-Ctrl+Alt+Esc
+# 🥈 Alternative — install.sh (same git + local copy)
+./install.sh
+
+# 🚀 One-liner (no clone, no git — just works)
+curl -sL https://raw.githubusercontent.com/Zulus-Code/\
+cinnamon-animated-weather-desklet/master/install.sh | bash
 ```
 
-> ⚠️ **Note:** The one-liner `curl | bash` method is no longer recommended. Use `git clone` for reliable installation and easy updates (`git pull`).
+After any method → **restart Cinnamon**: `Ctrl+Alt+Esc`
 
 ### Activate
 
@@ -50,11 +57,22 @@ Ctrl+Alt+Esc
 
 That's it — no API key needed. Works out of the box.
 
+### Uninstall
+
+```bash
+# From the repo directory (if you cloned it)
+make uninstall
+
+# Or using install.sh
+./install.sh --uninstall
+```
+
 ### Updating
 
 ```bash
 cd ~/.local/share/cinnamon/desklets/weather-animated@zulus/
 git pull
+make reinstall   # or: ./install.sh
 Ctrl+Alt+Esc
 ```
 
