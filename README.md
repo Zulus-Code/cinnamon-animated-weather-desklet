@@ -8,7 +8,7 @@ A beautiful, real-time animated weather desklet for Linux Mint Cinnamon desktop.
 
 - **Live animated weather** — rain drops, snowflakes, **hail stones**, drifting clouds, twinkling stars, **lightning flashes**, **rainbow**
 - **Rounded corners** — 24px radius with Cairo clipping for a modern glass-morph look
-- **Dual weather providers** — MET Norway (yr.no) works in regions where Open-Meteo is blocked, switchable in settings
+- **Dual weather providers** — MET Norway (yr.no) works in regions where Open-Meteo is blocked; Open-Meteo automatically falls back to MET Norway on network/API failures
 - **Ambient light integration** — snow, rain, and hail particles pick up sky tones for natural scene blending
 - **Daily forecast (3–5 days)** — day name, weather icon, hi/lo temperatures
 - **Hourly forecast** — 6/12/24 hour forecast strip, 8 slots (switchable via settings)
@@ -16,7 +16,7 @@ A beautiful, real-time animated weather desklet for Linux Mint Cinnamon desktop.
 - **Glassmorphism UI** — frosted glass panel with adaptive transparency
 - **Sky gradient** — dynamic sky colours that adapt to weather condition and time of day
 - **Auto location** — detects your city via IP geolocation (or set manually)
-- **Real-time data** — powered by MET Norway (yr.no) or Open-Meteo (free, no API key required)
+- **Real-time data** — powered by MET Norway (yr.no) or Open-Meteo with automatic MET Norway fallback (free, no API key required)
 - **6 colour themes** — Auto, Glass, Dark, Warm, Cool, Nature
 - **Configurable** — units, theme, opacity, background toggle, width, refresh interval, forecast mode, weather provider
 - **🌐 Russian language** — interface and settings available in Русский
@@ -143,7 +143,7 @@ The desklet is split into logical modules for maintainability:
 weather-animated@zulus/
 ├── desklet.js           # Main class — wires modules together, settings, lifecycle
 ├── constants.js         # Colors, WMO weather codes, i18n strings, emoji map
-├── weatherService.js    # Open-Meteo API, geocoding, forecast builder (daily + hourly)
+├── weatherService.js    # MET Norway/Open-Meteo API, geocoding, forecast builder (daily + hourly)
 ├── renderer.js          # Cairo/PangoCairo rendering — sky, glass panel, text, forecast, particles
 ├── particleSystem.js    # Particle physics — rain, snow, hail, clouds, stars
 ├── sceneBuilder.js      # Procedural sky builder — Perlin noise, fBm, cloud/fog/lighting
@@ -173,7 +173,7 @@ weather-animated@zulus/
 |--------|-------|---------------|
 | `desklet.js` | ~315 | Desklet class, settings binding, lifecycle, animation loop, container transparency |
 | `constants.js` | ~128 | Sky/palette colors, WMO→description dict (en/ru), emoji mapping, i18n strings |
-| `weatherService.js` | ~590 | Open-Meteo + MET Norway API, geocoding (Open-Meteo + ip-api.com), WMO→OWM ID mapping, symbol→WMO mapping, daily/hourly forecast builder |
+| `weatherService.js` | ~676 | Open-Meteo + MET Norway API, geocoding (Open-Meteo + ip-api.com), Open-Meteo→MET fallback, altitude-aware MET requests, WMO→OWM ID mapping, symbol→WMO mapping, daily/hourly forecast builder |
 | `renderer.js` | ~1030 | All drawing: sky gradient, glass panel, current weather UI, daily/hourly forecast, loading/error states |
 | `particleSystem.js` | ~520 | Particle classes, physics update, per-condition particle spawning (rain, snow, hail, clouds, stars) |
 | `sceneBuilder.js` | ~750 | Scene generation from weather codes, Perlin noise/fBm textures for clouds & fog, sky colour interpolation |
@@ -193,8 +193,8 @@ weather-animated@zulus/
 - **Procedural scene** — Perlin noise / fBm textures for realistic clouds and fog layers
 - **HTTP** — libsoup2 (queue_message) / libsoup3 (send_and_read_async) / blocking curl fallback, encapsulated in `weatherService.js`
 - **i18n** — custom `STRINGS` dict + `_(key)` helper in `constants.js`; Gettext `.po` files for settings dialog
-- **Weather API** — [MET Norway](https://www.yr.no/) (default) and [Open-Meteo](https://open-meteo.com/) (fallback). Both are free, no API key. Uses WMO weather codes mapped to OWM-compatible IDs for rendering compatibility. Provider switchable in desklet settings
-- **Geocoding** — [Open-Meteo Geocoding API](https://open-meteo.com/en/docs/geocoding-api) for city search, [ip-api.com](http://ip-api.com/) for auto-location
+- **Weather API** — [MET Norway](https://www.yr.no/) (default) and [Open-Meteo](https://open-meteo.com/). Both are free, no API key. If Open-Meteo forecast is unreachable, the desklet automatically falls back to MET Norway. Uses WMO weather codes mapped to OWM-compatible IDs for rendering compatibility. Provider switchable in desklet settings
+- **Geocoding** — [Open-Meteo Geocoding API](https://open-meteo.com/en/docs/geocoding-api) for city search, [ip-api.com](http://ip-api.com/) for auto-location. Manual `lat,lon` input is used directly; city search requests multiple candidates and uses returned elevation for altitude-aware MET Norway forecasts
 - **No dependencies** — pure JavaScript, no Node.js, no WebKit
 
 ## 📄 License

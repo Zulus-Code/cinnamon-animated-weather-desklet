@@ -3,6 +3,7 @@
 ## [2.3.0] - 2026-06-10
 
 ### Added
+- **Open-Meteo → MET Norway fallback** — if Open-Meteo forecast API is unreachable or blocked by the network/provider, weather data is fetched from MET Norway automatically
 - **MET Norway (yr.no) weather provider** — dual provider support, switchable in desklet settings. Works in regions where Open-Meteo is blocked (Russia, China, etc.)
 - **Rounded corners** — 24px border-radius on desklet container with Cairo clipping for a modern glass-morph look
 - **Ambient light integration** — rain, snow, and hail particles dynamically pick up sky tones for natural scene-weather blending
@@ -15,6 +16,8 @@
 - **Renderer tests** — 3 new tests (total: 122) for fallback sky colors and _iconToEmoji
 
 ### Changed
+- **Location resolving** — manual `lat,lon` input is parsed before geocoding; city geocoding now requests multiple candidates and respects country suffixes like `Moscow, RU`
+- **MET Norway accuracy** — known elevation from geocoding is passed as `altitude` to improve temperature correction
 - **README** — updated for MET Norway, dual providers, rounded corners, ambient light, config table
 - **Sun rendering** — multi-stop radial gradient for realistic solar disc effect
 - **Moon rendering** — softer glow falloff, smoother crescent shadows
@@ -25,6 +28,8 @@
 - **ESLint config** — updated for new file structure (no longer hardcodes 7 files)
 
 ### Fixed
+- **Provider switching** — changing weather provider or interface language now refreshes weather data immediately
+- **Open-Meteo network failures** — blocked/unreachable `api.open-meteo.com` no longer leaves the desklet in API error state when MET Norway fallback succeeds
 - **St not defined error** — added explicit `const St = imports.gi.St;` for Cinnamon >= 6.x
 
 ---
