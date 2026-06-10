@@ -1099,25 +1099,25 @@ Renderer.prototype._drawWeather = function (cr, w) {
     cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 1);
     this._cpango(cr, temp + unit, cx, topY + 30, 54, true);
 
-    cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.9);
+    cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.92);
     const desc = m.description.charAt(0).toUpperCase() + m.description.slice(1);
-    this._cpango(cr, desc, cx, topY + 58, 16, false);
+    this._cpango(cr, desc, cx, topY + 61, 17, false);
 
-    cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.7);
-    this._cpango(cr, this._('feels_like') + ' ' + feels + unit, cx, topY + 78, 13, false);
+    cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.75);
+    this._cpango(cr, this._('feels_like') + ' ' + feels + unit, cx, topY + 85, 14, false);
 
     const detailItems = [];
     if (d.showHumidity !== false) detailItems.push({ val: hum + '%', lbl: this._('humidity') });
     if (d.showWind !== false) detailItems.push({ val: wind + ' ' + this._('wind_unit'), lbl: this._('wind') });
     if (d.showPressure !== false) detailItems.push({ val: wd.main.pressure + ' ' + this._('pressure_unit'), lbl: this._('pressure') });
     if (detailItems.length > 0) {
-        const detailY = topY + 105, detailW = Math.min(w - 80, 300), sX = cx - detailW / 2, cW = detailW / detailItems.length;
+        const detailY = topY + 115, detailW = Math.min(w - 70, 300), sX = cx - detailW / 2, cW = detailW / detailItems.length;
         for (let i = 0; i < detailItems.length; i++) {
             const ix = sX + cW * i + cW / 2;
             cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 0.95);
-            this._cpango(cr, detailItems[i].val, ix, detailY + 19, 18, true);
-            cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.6);
-            this._cpango(cr, detailItems[i].lbl, ix, detailY + 37, 10, false);
+            this._cpango(cr, detailItems[i].val, ix, detailY + 20, 18, true);
+            cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.72);
+            this._cpango(cr, detailItems[i].lbl, ix, detailY + 42, 11, false);
         }
     }
     // ── Current date and time (one line) ──
@@ -1127,8 +1127,8 @@ Renderer.prototype._drawWeather = function (cr, w) {
         day: 'numeric', month: 'long',
         hour: '2-digit', minute: '2-digit'
     });
-    cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.85);
-    this._cpango(cr, dtStr, cx, topY + 190, 14, true);
+    cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.88);
+    this._cpango(cr, dtStr, cx, topY + 180, 14, false);
 };
 
 /* ── Forecast display ────────────────────────────────────────────────────── */
@@ -1143,17 +1143,17 @@ Renderer.prototype._drawForecast = function (cr, w) {
     const d = this._d;
     if (!d._forecast || !d._forecast.list) return;
     const tc = this._themeColors();
-    const fY = Math.min(300, d._height * 0.65), pad = 30, fw = w - pad * 2;
+    const fY = Math.min(285, d._height * 0.63), pad = 30, fw = w - pad * 2;
     const maxSlots = Math.min(d.forecastHours / 3 || 6, 8), step = fw / maxSlots;
 
     cr.save();
-    cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.15);
+    cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.18);
     cr.setLineWidth(1);
-    cr.moveTo(pad + 5, fY - 5);
-    cr.lineTo(w - pad - 5, fY - 5);
+    cr.moveTo(pad + 5, fY - 8);
+    cr.lineTo(w - pad - 5, fY - 8);
     cr.stroke();
-    cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.5);
-    this._drawPango(cr, this._('forecast'), pad + 5, fY - 10, 10, false);
+    cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.55);
+    this._drawPango(cr, this._('forecast'), pad + 5, fY - 13, 11, false);
 
     const list = d._forecast.list.slice(0, maxSlots);
     for (let i = 0; i < list.length; i++) {
@@ -1161,12 +1161,12 @@ Renderer.prototype._drawForecast = function (cr, w) {
         const dt = new Date(item.dt * 1000);
         const time = dt.getHours().toString().padStart(2, '0') + ':' + dt.getMinutes().toString().padStart(2, '0');
 
-        cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.7);
-        this._cpango(cr, time, fx, fY + 10, 10, false);
+        cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.72);
+        this._cpango(cr, time, fx, fY + 12, 11, false);
         cr.setSourceRGBA(1, 1, 1, 0.9);
-        this._cpango(cr, this._iconToEmoji(item.weather[0].icon, item.weather[0].id), fx, fY + 40, 20, false);
+        this._cpango(cr, this._iconToEmoji(item.weather[0].icon, item.weather[0].id), fx, fY + 42, 20, false);
         cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 0.95);
-        this._cpango(cr, Math.round(item.main.temp) + (d.units === 'metric' ? '\u00B0' : '\u00B0F'), fx, fY + 65, 13, true);
+        this._cpango(cr, Math.round(item.main.temp) + (d.units === 'metric' ? '\u00B0' : '\u00B0F'), fx, fY + 68, 13, true);
     }
     cr.restore();
 };
@@ -1183,38 +1183,38 @@ Renderer.prototype._drawDailyForecast = function (cr, w) {
     const d = this._d;
     if (!d._dailyForecast || d._dailyForecast.length === 0) return;
     const tc = this._themeColors();
-    const fY = Math.min(300, d._height * 0.65), pad = 30, fw = w - pad * 2;
+    const fY = Math.min(285, d._height * 0.63), pad = 30, fw = w - pad * 2;
     const list = d._dailyForecast.slice(0, 5);
     const step = fw / list.length;
 
     cr.save();
-    cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.15);
+    cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.18);
     cr.setLineWidth(1);
-    cr.moveTo(pad + 5, fY - 5);
-    cr.lineTo(w - pad - 5, fY - 5);
+    cr.moveTo(pad + 5, fY - 8);
+    cr.lineTo(w - pad - 5, fY - 8);
     cr.stroke();
-    cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.5);
-    this._drawPango(cr, this._('forecast'), pad + 5, fY - 10, 10, false);
+    cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.55);
+    this._drawPango(cr, this._('forecast'), pad + 5, fY - 13, 11, false);
 
     const unit = d.units === 'metric' ? '\u00B0' : '\u00B0F';
     for (let i = 0; i < list.length; i++) {
         const fx = pad + step * i + step / 2, item = list[i];
 
         // Day name
-        cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.7);
-        this._cpango(cr, item.day, fx, fY + 10, 10, false);
+        cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.72);
+        this._cpango(cr, item.day, fx, fY + 12, 11, false);
 
         // Weather emoji
         cr.setSourceRGBA(1, 1, 1, 0.9);
-        this._cpango(cr, this._iconToEmoji(item.weather[0].icon, item.weather[0].id), fx, fY + 40, 20, false);
+        this._cpango(cr, this._iconToEmoji(item.weather[0].icon, item.weather[0].id), fx, fY + 42, 20, false);
 
         // High / low temperatures
         const hi = Math.round(item.temp_max);
         const lo = Math.round(item.temp_min);
         cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 0.95);
-        this._cpango(cr, hi + unit, fx, fY + 62, 13, true);
-        cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.6);
-        this._cpango(cr, lo + unit, fx, fY + 77, 11, false);
+        this._cpango(cr, hi + unit, fx, fY + 65, 13, true);
+        cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.65);
+        this._cpango(cr, lo + unit, fx, fY + 82, 11, false);
     }
     cr.restore();
 };
@@ -1230,8 +1230,8 @@ Renderer.prototype._drawDailyForecast = function (cr, w) {
  */
 Renderer.prototype._drawLoading = function (cr, w, h) {
     const tc = this._themeColors();
-    cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 0.7);
-    this._cpango(cr, this._('loading'), w / 2, h / 2, 18, false);
+    cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 0.75);
+    this._cpango(cr, this._('loading'), w / 2, h / 2, 20, false);
 };
 
 /* ── Error state ─────────────────────────────────────────────────────────── */
@@ -1256,15 +1256,15 @@ Renderer.prototype._drawError = function (cr, w, h, errInfo) {
     }
 
     const lines = errMsg.split('\n');
-    let ly = h / 2 - lines.length * 10;
+    let ly = h / 2 - lines.length * 12;
     for (let li = 0; li < lines.length; li++) {
         let line = lines[li];
-        if (this._pangoWidth(cr, line, 14, false) > w - 60) {
-            while (this._pangoWidth(cr, line + '...', 14, false) > w - 60 && line.length > 3) { line = line.slice(0, -1); }
+        if (this._pangoWidth(cr, line, 15, false) > w - 60) {
+            while (this._pangoWidth(cr, line + '...', 15, false) > w - 60 && line.length > 3) { line = line.slice(0, -1); }
             line += '...';
         }
-        this._cpango(cr, line, w / 2, ly, 14, false);
-        ly += 22;
+        this._cpango(cr, line, w / 2, ly, 15, false);
+        ly += 24;
     }
 };
 
@@ -1283,7 +1283,7 @@ Renderer.prototype._drawError = function (cr, w, h, errInfo) {
 Renderer.prototype._drawPango = function (cr, text, x, y, size, bold) {
     const layout = PangoCairo.create_layout(cr);
     layout.set_text(text, -1);
-    const fd = Pango.FontDescription.from_string('Ubuntu, Sans ' + size);
+    const fd = Pango.FontDescription.from_string('Ubuntu, Cantarell, Sans ' + size);
     if (bold) fd.set_weight(Pango.Weight.BOLD);
     layout.set_font_description(fd);
     cr.moveTo(x, y - layout.get_baseline() / Pango.SCALE);
@@ -1302,7 +1302,7 @@ Renderer.prototype._pangoWidth = function (cr, text, size, bold) {
     try {
         const layout = PangoCairo.create_layout(cr);
         layout.set_text(text, -1);
-        const fd = Pango.FontDescription.from_string('Ubuntu, Sans ' + size);
+        const fd = Pango.FontDescription.from_string('Ubuntu, Cantarell, Sans ' + size);
         if (bold) fd.set_weight(Pango.Weight.BOLD);
         layout.set_font_description(fd);
         return layout.get_pixel_size()[0];
