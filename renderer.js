@@ -37,6 +37,16 @@ function Renderer(desklet) {
     // Internal clock for fog animation drift
     this._time = 0;
     this._lastDrawTime = 0;
+
+    // Pango/font measurement caches: text is redrawn often but changes rarely.
+    this._fontDescCache = {};
+    this._pangoWidthCache = {};
+    this._pangoWidthCacheKeys = [];
+    this._pangoWidthCacheLimit = 300;
+
+    // Date/time cache: the visible clock only changes once per minute.
+    this._dateTimeCacheKey = '';
+    this._dateTimeCacheValue = '';
 }
 
 /* ── Set noise texture reference (called by desklet after SceneBuilder init) ── */
@@ -1084,7 +1094,14 @@ Renderer.prototype._drawRainbow = function (cr, w, h, scene) {
  * @returns {void}
  */
 Renderer.prototype._cpango = function (cr, txt, cx, y, sz, bold) {
-    this._drawPango(cr, txt, cx - this._pangoWidth(cr, txt, sz, bold) / 2, y, sz, bold);
+    try {
+        const layout = this._createPangoLayout(cr, txt, sz, bold);
+        const width = layout.get_pixel_size()[0];
+        cr.moveTo(cx - width / 2, y - layout.get_baseline() / Pango.SCALE);
+        PangoCairo.show_layout(cr, layout);
+    } catch (e) {
+        this._drawCairoTextFallback(cr, txt, cx - (txt.length * 9) / 2, y, sz, bold);
+    }
 };
 
 /* ── Current weather display ─────────────────────────────────────────────── */
@@ -1129,14 +1146,31 @@ Renderer.prototype._drawWeather = function (cr, w) {
         }
     }
     // ── Current date and time (one line) ──
-    const locale = (this._d.language || 'en') === 'ru' ? 'ru-RU' : 'en-US';
-    const now = new Date();
-    const dtStr = now.toLocaleString(locale, {
-        day: 'numeric', month: 'long',
-        hour: '2-digit', minute: '2-digit'
-    });
+    const dtStr = this._formatDateTimeCached();
     cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.88);
     this._cpango(cr, dtStr, cx, topY + 180, 14, false);
+};
+
+/**
+ * Format and cache the current date/time string until the minute changes.
+ * @returns {string} Localised date/time string
+ */
+Renderer.prototype._formatDateTimeCached = function () {
+    const lang = this._d.language || 'en';
+    const locale = lang === 'ru' ? 'ru-RU' : 'en-US';
+    const now = new Date();
+    const key = locale + '|' + now.getFullYear() + '|' + now.getMonth() + '|' +
+        now.getDate() + '|' + now.getHours() + '|' + now.getMinutes();
+
+    if (key !== this._dateTimeCacheKey) {
+        this._dateTimeCacheKey = key;
+        this._dateTimeCacheValue = now.toLocaleString(locale, {
+            day: 'numeric', month: 'long',
+            hour: '2-digit', minute: '2-digit'
+        });
+    }
+
+    return this._dateTimeCacheValue;
 };
 
 /* ── Forecast display ────────────────────────────────────────────────────── */
@@ -1289,13 +1323,63 @@ Renderer.prototype._drawError = function (cr, w, h, errInfo) {
  * @returns {void}
  */
 Renderer.prototype._drawPango = function (cr, text, x, y, size, bold) {
-    const layout = PangoCairo.create_layout(cr);
-    layout.set_text(text, -1);
-    const fd = Pango.FontDescription.from_string('Ubuntu, Cantarell, Sans ' + size);
-    if (bold) fd.set_weight(Pango.Weight.BOLD);
-    layout.set_font_description(fd);
+    const layout = this._createPangoLayout(cr, text, size, bold);
     cr.moveTo(x, y - layout.get_baseline() / Pango.SCALE);
     PangoCairo.show_layout(cr, layout);
+};
+
+/**
+ * Get a cached Pango font description for a size/weight pair.
+ * @param {number} size - Font size
+ * @param {boolean} bold - Whether to use bold weight
+ * @returns {Pango.FontDescription} Cached font description
+ */
+Renderer.prototype._getFontDescription = function (size, bold) {
+    const key = size + '|' + (bold ? '1' : '0');
+    let fd = this._fontDescCache[key];
+    if (!fd) {
+        fd = Pango.FontDescription.from_string('Ubuntu, Cantarell, Sans ' + size);
+        if (bold) fd.set_weight(Pango.Weight.BOLD);
+        this._fontDescCache[key] = fd;
+    }
+    return fd;
+};
+
+/**
+ * Create a Pango layout using a cached font description.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {string} text - Text to render
+ * @param {number} size - Font size
+ * @param {boolean} bold - Whether to use bold weight
+ * @returns {Pango.Layout} Pango layout
+ */
+Renderer.prototype._createPangoLayout = function (cr, text, size, bold) {
+    const layout = PangoCairo.create_layout(cr);
+    layout.set_text(text, -1);
+    layout.set_font_description(this._getFontDescription(size, bold));
+    return layout;
+};
+
+/**
+ * Draw basic Cairo text when Pango layout creation fails.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {string} text - Text to render
+ * @param {number} x - X position
+ * @param {number} y - Y baseline position
+ * @param {number} size - Font size
+ * @param {boolean} bold - Whether to use bold weight
+ * @returns {void}
+ */
+Renderer.prototype._drawCairoTextFallback = function (cr, text, x, y, size, bold) {
+    try {
+        if (typeof cr.selectFontFace === 'function') {
+            cr.selectFontFace('Sans', Cairo.FontSlant.NORMAL,
+                bold ? Cairo.FontWeight.BOLD : Cairo.FontWeight.NORMAL);
+        }
+        if (typeof cr.setFontSize === 'function') cr.setFontSize(size);
+        cr.moveTo(x, y);
+        if (typeof cr.showText === 'function') cr.showText(text);
+    } catch (e) {}
 };
 
 /**
@@ -1307,16 +1391,34 @@ Renderer.prototype._drawPango = function (cr, text, x, y, size, bold) {
  * @returns {number} Pixel width of the text
  */
 Renderer.prototype._pangoWidth = function (cr, text, size, bold) {
+    const key = size + '|' + (bold ? '1' : '0') + '|' + text;
+    if (this._pangoWidthCache[key] !== undefined) return this._pangoWidthCache[key];
+
     try {
-        const layout = PangoCairo.create_layout(cr);
-        layout.set_text(text, -1);
-        const fd = Pango.FontDescription.from_string('Ubuntu, Cantarell, Sans ' + size);
-        if (bold) fd.set_weight(Pango.Weight.BOLD);
-        layout.set_font_description(fd);
-        return layout.get_pixel_size()[0];
+        const layout = this._createPangoLayout(cr, text, size, bold);
+        const width = layout.get_pixel_size()[0];
+        this._rememberPangoWidth(key, width);
+        return width;
     } catch (e) {
         return text.length * 9;
     }
+};
+
+/**
+ * Store a measured Pango width with a small FIFO limit.
+ * @param {string} key - Cache key
+ * @param {number} width - Measured width
+ * @returns {void}
+ */
+Renderer.prototype._rememberPangoWidth = function (key, width) {
+    if (this._pangoWidthCache[key] === undefined) {
+        this._pangoWidthCacheKeys.push(key);
+        if (this._pangoWidthCacheKeys.length > this._pangoWidthCacheLimit) {
+            const oldKey = this._pangoWidthCacheKeys.shift();
+            delete this._pangoWidthCache[oldKey];
+        }
+    }
+    this._pangoWidthCache[key] = width;
 };
 
 /**

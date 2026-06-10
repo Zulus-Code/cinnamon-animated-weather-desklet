@@ -224,6 +224,43 @@ test('_lerpArr interpolates array at t=0.5', () => {
     assert.deepStrictEqual(r, [1, 2, 3]);
 });
 
+// _lerpArrInPlace (in-place mutation variant)
+function _lerpArrInPlace(current, target, t) {
+    current[0] += (target[0] - current[0]) * t;
+    current[1] += (target[1] - current[1]) * t;
+    current[2] += (target[2] - current[2]) * t;
+    return current;
+}
+
+test('_lerpArrInPlace mutates the original array', () => {
+    const cur = [0, 0, 0];
+    const tar = [2, 4, 6];
+    const r = _lerpArrInPlace(cur, tar, 0.5);
+    assert.strictEqual(r, cur);          // same reference
+    assert.notDeepStrictEqual(cur, [0, 0, 0]); // was mutated
+});
+
+test('_lerpArrInPlace returns the same array reference', () => {
+    const cur = [10, 20, 30];
+    const tar = [40, 50, 60];
+    const r = _lerpArrInPlace(cur, tar, 0.5);
+    assert.strictEqual(r, cur);
+});
+
+test('_lerpArrInPlace interpolates correctly at t=0.5', () => {
+    const cur = [0, 0, 0];
+    const tar = [2, 4, 6];
+    _lerpArrInPlace(cur, tar, 0.5);
+    assert.deepStrictEqual(cur, [1, 2, 3]);
+});
+
+test('_lerpArrInPlace reaches target at t=1', () => {
+    const cur = [0, 0, 0];
+    const tar = [2, 4, 6];
+    _lerpArrInPlace(cur, tar, 1);
+    assert.deepStrictEqual(cur, [2, 4, 6]);
+});
+
 // _moonPhase
 test('moonPhase day 1 is 0 (new moon approx)', () => {
     const phase = _moonPhase(1);

@@ -234,6 +234,37 @@ test('_formatDateTime en contains English month name', () => {
     assert.ok(hasEnMonth, 'en date string "' + s + '" should contain an English month');
 });
 
+// ── Date/time cache key (for _formatDateTimeCached) ──
+
+/**
+ * Generate cache key for a given language and date (mimics renderer.js logic).
+ * @param {string} lang - Language code ('ru' or 'en')
+ * @param {Date} date - Date object to key on
+ * @returns {string} Cache key that is stable within the same minute
+ */
+function _dateTimeCacheKey(lang, date) {
+    const locale = lang === 'ru' ? 'ru-RU' : 'en-US';
+    return locale + '|' + date.getFullYear() + '|' + date.getMonth() + '|' +
+        date.getDate() + '|' + date.getHours() + '|' + date.getMinutes();
+}
+
+test('dateTimeCacheKey same minute yields identical key', () => {
+    const d1 = new Date(2025, 5, 10, 14, 30, 0);
+    const d2 = new Date(2025, 5, 10, 14, 30, 45); // same minute, diff seconds
+    assert.strictEqual(_dateTimeCacheKey('en', d1), _dateTimeCacheKey('en', d2));
+});
+
+test('dateTimeCacheKey changes when minute changes', () => {
+    const d1 = new Date(2025, 5, 10, 14, 30, 0);
+    const d2 = new Date(2025, 5, 10, 14, 31, 0);
+    assert.notStrictEqual(_dateTimeCacheKey('en', d1), _dateTimeCacheKey('en', d2));
+});
+
+test('dateTimeCacheKey changes when language changes', () => {
+    const d = new Date(2025, 5, 10, 14, 30, 0);
+    assert.notStrictEqual(_dateTimeCacheKey('en', d), _dateTimeCacheKey('ru', d));
+});
+
 test('_formatDateTime string fits within minimum desklet width (200px)', () => {
     // Approximate Pango text width: ~7-9px per char at 14px bold
     const sRu = _formatDateTime('ru');

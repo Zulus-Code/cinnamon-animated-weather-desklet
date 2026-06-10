@@ -797,7 +797,7 @@ SceneBuilder.prototype.update = function (dt) {
         this._cloudOffsets[i] += dt * this._target.cloudSpeed[i] * (i + 1);
         if (this._cloudOffsets[i] > 1000) this._cloudOffsets[i] -= 1000;
     }
-    this._current.cloudOffsets = this._cloudOffsets.slice();
+    this._current.cloudOffsets = this._cloudOffsets;
 
     // Interpolate current → target
     const speed = Math.min(1, this._transitionSpeed * dt);
@@ -837,14 +837,14 @@ SceneBuilder.prototype._interpolateScene = function (t) {
         c.cloudDensity[i] = _lerp(c.cloudDensity[i], tar.cloudDensity[i], t);
     }
 
-    c.skyTopColor    = _lerpArr(c.skyTopColor, tar.skyTopColor, t);
-    c.skyMidColor    = _lerpArr(c.skyMidColor, tar.skyMidColor, t);
-    c.skyBottomColor = _lerpArr(c.skyBottomColor, tar.skyBottomColor, t);
-    c.sunColor       = _lerpArr(c.sunColor, tar.sunColor, t);
-    c.sunGlowColor   = _lerpArr(c.sunGlowColor, tar.sunGlowColor, t);
-    c.horizonGlow    = _lerpArr(c.horizonGlow, tar.horizonGlow, t);
-    c.panelTint      = _lerpArr(c.panelTint, tar.panelTint, t);
-    c.ambientLight   = _lerpArr(c.ambientLight, tar.ambientLight, t);
+    _lerpArrInPlace(c.skyTopColor, tar.skyTopColor, t);
+    _lerpArrInPlace(c.skyMidColor, tar.skyMidColor, t);
+    _lerpArrInPlace(c.skyBottomColor, tar.skyBottomColor, t);
+    _lerpArrInPlace(c.sunColor, tar.sunColor, t);
+    _lerpArrInPlace(c.sunGlowColor, tar.sunGlowColor, t);
+    _lerpArrInPlace(c.horizonGlow, tar.horizonGlow, t);
+    _lerpArrInPlace(c.panelTint, tar.panelTint, t);
+    _lerpArrInPlace(c.ambientLight, tar.ambientLight, t);
 };
 
 /* ── Get cloud offset for animation ────────────────────────────────────── */
@@ -906,6 +906,20 @@ function _lerpArr(a, b, t) {
         a[1] + (b[1] - a[1]) * t,
         a[2] + (b[2] - a[2]) * t
     ];
+}
+
+/**
+ * Interpolate a 3-element array in-place to avoid per-frame allocations.
+ * @param {number[]} current - Mutable current array [r, g, b]
+ * @param {number[]} target - Target array [r, g, b]
+ * @param {number} t - Interpolation factor [0, 1]
+ * @returns {number[]} The mutated current array
+ */
+function _lerpArrInPlace(current, target, t) {
+    current[0] += (target[0] - current[0]) * t;
+    current[1] += (target[1] - current[1]) * t;
+    current[2] += (target[2] - current[2]) * t;
+    return current;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

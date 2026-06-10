@@ -383,7 +383,6 @@ ParticleSystem.prototype._updateHail = function (p, dt, w, h) {
 ParticleSystem.prototype.draw = function (cr) {
     for (let i = 0; i < this.particles.length; i++) {
         const p = this.particles[i];
-        cr.save();
 
         switch (p.type) {
             case 'rain':
@@ -416,8 +415,6 @@ ParticleSystem.prototype.draw = function (cr) {
                 this._drawHail(cr, p);
                 break;
         }
-
-        cr.restore();
     }
 };
 
@@ -484,39 +481,44 @@ ParticleSystem.prototype._drawSnow = function (cr, p) {
     // Draw snowflake as a small circle with subtle hexagonal hint
     if (s > 3) {
         // Larger flakes: draw a simple star pattern
-        cr.translate(p.x, p.y);
-        cr.rotate(angle);
+        cr.save();
+        try {
+            cr.translate(p.x, p.y);
+            cr.rotate(angle);
 
-        // Central dot
-        cr.arc(0, 0, s * 0.3, 0, Math.PI * 2);
-        cr.fill();
+            // Central dot
+            cr.arc(0, 0, s * 0.3, 0, Math.PI * 2);
+            cr.fill();
 
-        // 6-pointed star (simplified snowflake)
-        cr.setLineWidth(s * 0.2);
-        cr.setSourceRGBA(sr, sg, sb, alpha * 0.5);
-        for (let arm = 0; arm < 6; arm++) {
-            const a = arm * Math.PI / 3;
-            cr.moveTo(0, 0);
-            cr.lineTo(Math.cos(a) * s, Math.sin(a) * s);
-            cr.stroke();
+            // 6-pointed star (simplified snowflake)
+            cr.setLineWidth(s * 0.2);
+            cr.setSourceRGBA(sr, sg, sb, alpha * 0.5);
+            for (let arm = 0; arm < 6; arm++) {
+                const a = arm * Math.PI / 3;
+                cr.moveTo(0, 0);
+                cr.lineTo(Math.cos(a) * s, Math.sin(a) * s);
+                cr.stroke();
 
-            // Tiny branches
-            const bx = Math.cos(a) * s * 0.6;
-            const by = Math.sin(a) * s * 0.6;
-            cr.moveTo(bx, by);
-            cr.lineTo(bx + Math.cos(a + 0.4) * s * 0.3,
-                by + Math.sin(a + 0.4) * s * 0.3);
-            cr.stroke();
-            cr.moveTo(bx, by);
-            cr.lineTo(bx + Math.cos(a - 0.4) * s * 0.3,
-                by + Math.sin(a - 0.4) * s * 0.3);
-            cr.stroke();
+                // Tiny branches
+                const bx = Math.cos(a) * s * 0.6;
+                const by = Math.sin(a) * s * 0.6;
+                cr.moveTo(bx, by);
+                cr.lineTo(bx + Math.cos(a + 0.4) * s * 0.3,
+                    by + Math.sin(a + 0.4) * s * 0.3);
+                cr.stroke();
+                cr.moveTo(bx, by);
+                cr.lineTo(bx + Math.cos(a - 0.4) * s * 0.3,
+                    by + Math.sin(a - 0.4) * s * 0.3);
+                cr.stroke();
+            }
+
+            // Outer glow
+            cr.setSourceRGBA(sr, sg, sb, alpha * 0.08);
+            cr.arc(0, 0, s * 2, 0, Math.PI * 2);
+            cr.fill();
+        } finally {
+            cr.restore();
         }
-
-        // Outer glow
-        cr.setSourceRGBA(sr, sg, sb, alpha * 0.08);
-        cr.arc(0, 0, s * 2, 0, Math.PI * 2);
-        cr.fill();
     } else {
         // Small flakes: simple dot
         cr.arc(p.x, p.y, s * 0.8, 0, Math.PI * 2);
@@ -583,26 +585,28 @@ ParticleSystem.prototype._drawHail = function (cr, p) {
 
     // Larger hail: icy ball with highlight
     cr.save();
-    cr.translate(p.x, p.y);
-    cr.rotate(angle);
+    try {
+        cr.translate(p.x, p.y);
+        cr.rotate(angle);
 
-    // Main icy ball
-    cr.setSourceRGBA(0.78 * amb[0], 0.83 * amb[1], 0.96 * amb[2], p.alpha * 0.85);
-    cr.arc(0, 0, s, 0, Math.PI * 2);
-    cr.fill();
+        // Main icy ball
+        cr.setSourceRGBA(0.78 * amb[0], 0.83 * amb[1], 0.96 * amb[2], p.alpha * 0.85);
+        cr.arc(0, 0, s, 0, Math.PI * 2);
+        cr.fill();
 
-    // Highlight (light reflection)
-    cr.setSourceRGBA(1, 1, 1, p.alpha * 0.5);
-    cr.arc(-s * 0.25, -s * 0.25, s * 0.35, 0, Math.PI * 2);
-    cr.fill();
+        // Highlight (light reflection)
+        cr.setSourceRGBA(1, 1, 1, p.alpha * 0.5);
+        cr.arc(-s * 0.25, -s * 0.25, s * 0.35, 0, Math.PI * 2);
+        cr.fill();
 
-    // Ice ring (subtle)
-    cr.setSourceRGBA(1, 1, 1, p.alpha * 0.2);
-    cr.setLineWidth(0.5);
-    cr.arc(0, 0, s * 0.7, 0, Math.PI * 2);
-    cr.stroke();
-
-    cr.restore();
+        // Ice ring (subtle)
+        cr.setSourceRGBA(1, 1, 1, p.alpha * 0.2);
+        cr.setLineWidth(0.5);
+        cr.arc(0, 0, s * 0.7, 0, Math.PI * 2);
+        cr.stroke();
+    } finally {
+        cr.restore();
+    }
 
     // Faint glow
     cr.setSourceRGBA(0.7, 0.8, 1.0, p.alpha * 0.08);
