@@ -13,6 +13,25 @@ const Lang = imports.lang;
 const Constants = imports.constants;
 const Utils = imports.utils;
 
+/* ── MET Norway symbol code → WMO code mapping ─────────────────────────── */
+const SYMBOL_TO_WMO = {
+    clearsky: 0, fair: 1, partlycloudy: 2, cloudy: 3,
+    fog: 45, fog_patches: 48,
+    lightdrizzle: 51, drizzle: 53, heavydrizzle: 55,
+    lightfreezingdrizzle: 56, freezingdrizzle: 57,
+    lightrain: 61, rain: 63, heavyrain: 65,
+    lightfreezingrain: 66, freezingrain: 67,
+    lightsnow: 71, snow: 73, heavysnow: 75, snowgrains: 77,
+    lightrainshowers: 80, rainshowers: 81, heavyrainshowers: 82,
+    lightsnowshowers: 85, snowshowers: 86, heavysnowshowers: 86,
+    lightssleetshowers: 66, sleetshowers: 67, heavysleetshowers: 67,
+    sleet: 67, heavysleet: 67, lightsleet: 66,
+    thunder: 95, thunderstorm: 95,
+    rainandthunder: 95, snowandthunder: 95,
+    heavyrainandthunder: 96, rainshowersandthunder: 96,
+    sleetshowersandthunder: 96, snowshowersandthunder: 96
+};
+
 /* ── WeatherService constructor ──────────────────────────────────────────── */
 
 /**
@@ -22,9 +41,11 @@ const Utils = imports.utils;
  */
 function WeatherService() {
     this._httpSession = null;
+    this._provider = 'met-norway';
     try {
         this._httpSession = new Soup.Session();
         this._httpSession.timeout = 10;
+        this._httpSession.user_agent = 'weather-animated-desklet/2.0 (weather-animated@zulus)';
     } catch (e) {
         this._httpSession = null;
     }
@@ -193,9 +214,16 @@ WeatherService.prototype.resolveLocation = function (location, language, onSucce
  */
 WeatherService.prototype.fetchWeather = function (lat, lon, name, country, units, language, onSuccess, onError) {
     const self = this;
+    this._lang = language || 'en';
+
+    if (this._provider === 'met-norway') {
+        this._fetchMetNorway(lat, lon, name, country, units, language, onSuccess, onError);
+        return;
+    }
+
+    // ── Open-Meteo (default) ──
     const tempUnit = units === 'metric' ? 'celsius' : 'fahrenheit';
     const windUnit = units === 'metric' ? 'kmh' : 'mph';
-    this._lang = language || 'en';
 
     const url = 'https://api.open-meteo.com/v1/forecast'
         + '?latitude=' + lat + '&longitude=' + lon
@@ -331,6 +359,286 @@ WeatherService.prototype._buildDailyForecast = function (daily, lang) {
 
         // Stop at 5 days
         if (list.length >= 5) break;
+    }
+
+    return list.length > 0 ? list : null;
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  MET NORWAY (yr.no) PROVIDER
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Parse a MET Norway symbol_code into { base, isNight }.
+ * Symbol codes like "partlycloudy_day", "fog", "rainshowers_night".
+ * @param {string} code - Symbol code from MET Norway
+ * @returns {Object} { base: string, isNight: boolean }
+ */
+WeatherService.prototype._parseMetSymbol = function (code) {
+    if (!code) return { base: 'fair', isNight: false };
+    let base = code;
+    let isNight = false;
+    if (code.endsWith('_night')) {
+        isNight = true;
+        base = code.slice(0, -6);
+    } else if (code.endsWith('_day')) {
+        base = code.slice(0, -4);
+    }
+    return { base: base || 'fair', isNight: isNight };
+};
+
+/**
+ * Fetch sunrise/sunset times from MET Norway Sunrise API.
+ * @param {number} lat - Latitude
+ * @param {number} lon - Longitude
+ * @param {Function} onResult - Callback (sunriseMinutes, sunsetMinutes) or (null, null)
+ * @returns {void}
+ */
+WeatherService.prototype._getMetNorwaySunrise = function (lat, lon, onResult) {
+    const now = new Date();
+    const dateStr = now.getFullYear() + '-' +
+        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+        String(now.getDate()).padStart(2, '0');
+    const tzOffset = -now.getTimezoneOffset();
+    const offsetStr = (tzOffset >= 0 ? '+' : '-') +
+        String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, '0') + ':' +
+        String(Math.abs(tzOffset) % 60).padStart(2, '0');
+    const url = 'https://api.met.no/weatherapi/sunrise/3.0/sun?lat=' + lat + '&lon=' + lon +
+        '&date=' + dateStr + '&offset=' + encodeURIComponent(offsetStr);
+
+    this._httpGet(url, function (data) {
+        try {
+            const json = JSON.parse(data);
+            if (json.properties && json.properties.sunrise && json.properties.sunset) {
+                const sr = Utils._getMinutes(json.properties.sunrise.time);
+                const ss = Utils._getMinutes(json.properties.sunset.time);
+                onResult(sr, ss);
+                return;
+            }
+        } catch (e) {}
+        onResult(null, null);
+    }, function () { onResult(null, null); });
+};
+
+/**
+ * Fetch weather from MET Norway (yr.no) Locationforecast 2.0 API.
+ * @param {number} lat - Latitude
+ * @param {number} lon - Longitude
+ * @param {string} name - Location name
+ * @param {string} country - Country code
+ * @param {string} units - Unit system ('metric' or 'imperial')
+ * @param {string} language - Language code
+ * @param {Function} onSuccess - Callback on success
+ * @param {Function} onError - Callback on error
+ * @returns {void}
+ */
+WeatherService.prototype._fetchMetNorway = function (lat, lon, name, country, units, language, onSuccess, onError) {
+    const self = this;
+    const url = 'https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + lat + '&lon=' + lon;
+
+    this._httpGet(url, function (data) {
+        try {
+            const json = JSON.parse(data);
+            if (!json.properties || !json.properties.timeseries || json.properties.timeseries.length === 0) {
+                onError({ key: 'api_err', detail: 'No data from MET Norway' });
+                return;
+            }
+
+            const timeseries = json.properties.timeseries;
+            const meta = json.properties.meta || {};
+
+            // Find the closest time point to now
+            const now = Date.now();
+            let closest = timeseries[0];
+            let minDiff = Infinity;
+            for (let i = 0; i < timeseries.length; i++) {
+                const t = new Date(timeseries[i].time).getTime();
+                const diff = Math.abs(t - now);
+                if (diff < minDiff) { minDiff = diff; closest = timeseries[i]; }
+            }
+
+            const inst = closest.data.instant.details;
+            const symbol1h = (closest.data.next_1_hours && closest.data.next_1_hours.summary)
+                ? closest.data.next_1_hours.summary.symbol_code : null;
+            const symbol6h = (closest.data.next_6_hours && closest.data.next_6_hours.summary)
+                ? closest.data.next_6_hours.summary.symbol_code : null;
+
+            // Parse symbol code → base + day/night
+            const symCode = symbol1h || symbol6h || 'fair_day';
+            const parsed = self._parseMetSymbol(symCode);
+            const wmoCode = SYMBOL_TO_WMO[parsed.base] !== undefined ? SYMBOL_TO_WMO[parsed.base] : 0;
+            const owmId = Utils.wmoToOwmId(wmoCode);
+            const icon = _iconNum(owmId) + (parsed.isNight ? 'n' : 'd');
+
+            // Temperature
+            let temp = inst.air_temperature;
+            let feels = inst.air_temperature;
+            // Wind chill approximation when windy
+            if (inst.wind_speed > 2) {
+                feels = inst.air_temperature - 1.5 * Math.sqrt(inst.wind_speed);
+            }
+
+            // Wind speed: MET Norway returns m/s, desklet shows km/h (metric)
+            let windSpeed = inst.wind_speed;
+            if (units === 'metric') windSpeed = inst.wind_speed * 3.6; // m/s → km/h
+
+            const lang = language || 'en';
+            const desc = (Constants.WMO_DESCRIPTIONS[lang] && Constants.WMO_DESCRIPTIONS[lang][wmoCode])
+                || Constants.WMO_DESCRIPTIONS.en[wmoCode] || 'clear sky';
+
+            const weatherData = {
+                name: name || '',
+                sys: { country: country || '' },
+                main: {
+                    temp: temp,
+                    feels_like: Math.round(feels * 10) / 10,
+                    humidity: inst.relative_humidity,
+                    pressure: Math.round(inst.air_pressure_at_sea_level || 1013)
+                },
+                wind: { speed: Math.round(windSpeed * 10) / 10 },
+                weather: [{ id: owmId, main: desc, description: desc, icon: icon }]
+            };
+
+            // ── Fetch sunrise/sunset separately ──
+            self._getMetNorwaySunrise(lat, lon, function (sunriseMin, sunsetMin) {
+                const nowMin = new Date();
+                const curMin = nowMin.getHours() * 60 + nowMin.getMinutes();
+                const isNight = (sunriseMin !== null && sunsetMin !== null)
+                    ? (curMin < sunriseMin || curMin > sunsetMin)
+                    : parsed.isNight;
+
+                // Override icon if night
+                if (isNight && !weatherData.weather[0].icon.endsWith('n')) {
+                    weatherData.weather[0].icon = _iconNum(owmId) + 'n';
+                }
+
+                onSuccess({
+                    weather: weatherData,
+                    forecast: self._buildHourlyFromMetNorway(timeseries, sunriseMin, sunsetMin),
+                    dailyForecast: self._buildDailyFromMetNorway(timeseries, self._lang),
+                    sunriseMinutes: sunriseMin,
+                    sunsetMinutes: sunsetMin
+                });
+            });
+        } catch (e) {
+            onError({ key: 'parse_err', detail: e.toString().slice(0, 60) });
+        }
+    }, function (err) { onError({ key: 'api_err', detail: 'MET Norway: ' + err }); });
+};
+
+/**
+ * Build hourly forecast from MET Norway timeseries.
+ * @param {Array} timeseries - MET Norway timeseries array
+ * @param {number|null} sunriseMin - Sunrise minutes-since-midnight
+ * @param {number|null} sunsetMin - Sunset minutes-since-midnight
+ * @returns {Object|null} Forecast object with list, or null
+ */
+WeatherService.prototype._buildHourlyFromMetNorway = function (timeseries, sunriseMin, sunsetMin) {
+    const now = Date.now();
+    const list = [];
+
+    for (let i = 0; i < timeseries.length && list.length < 8; i++) {
+        const t = timeseries[i];
+        const dt = new Date(t.time);
+        if (dt.getTime() <= now) continue;
+
+        const inst = t.data.instant.details;
+        const sym = (t.data.next_1_hours && t.data.next_1_hours.summary)
+            ? t.data.next_1_hours.summary.symbol_code : null;
+
+        if (!sym) continue;
+
+        const parsed = this._parseMetSymbol(sym || 'fair_day');
+        const wmoCode = SYMBOL_TO_WMO[parsed.base] !== undefined ? SYMBOL_TO_WMO[parsed.base] : 0;
+        const owmId = Utils.wmoToOwmId(wmoCode);
+
+        const slotMinutes = dt.getHours() * 60 + dt.getMinutes();
+        let slotNight = parsed.isNight;
+        if (sunriseMin !== null && sunsetMin !== null) {
+            slotNight = slotMinutes < sunriseMin || slotMinutes > sunsetMin;
+        }
+
+        list.push({
+            dt: Math.floor(dt.getTime() / 1000),
+            main: { temp: inst.air_temperature },
+            weather: [{ icon: _iconNum(owmId) + (slotNight ? 'n' : 'd'), id: owmId }]
+        });
+    }
+    return list.length > 0 ? { list: list } : null;
+};
+
+/**
+ * Build daily forecast from MET Norway timeseries.
+ * Groups points by calendar date, uses most common symbol per day.
+ * @param {Array} timeseries - MET Norway timeseries array
+ * @param {string} lang - Language code
+ * @returns {Array|null} Array of daily forecast items, or null
+ */
+WeatherService.prototype._buildDailyFromMetNorway = function (timeseries, lang) {
+    lang = lang || 'en';
+
+    // Group by date
+    const days = {};
+    for (let i = 0; i < timeseries.length; i++) {
+        const t = timeseries[i];
+        const dt = new Date(t.time);
+        const dateKey = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') +
+            '-' + String(dt.getDate()).padStart(2, '0');
+
+        if (!days[dateKey]) days[dateKey] = [];
+        days[dateKey].push(t);
+    }
+
+    const now = new Date();
+    const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') +
+        '-' + String(now.getDate()).padStart(2, '0');
+
+    const sortedKeys = Object.keys(days).sort();
+    const list = [];
+
+    for (let k = 0; k < sortedKeys.length && list.length < 5; k++) {
+        const key = sortedKeys[k];
+        if (key === todayStr) continue; // skip today
+
+        const pts = days[key];
+        let minTemp = Infinity, maxTemp = -Infinity;
+        const symCounts = {};
+
+        for (let p = 0; p < pts.length; p++) {
+            const inst = pts[p].data.instant.details;
+            if (inst.air_temperature < minTemp) minTemp = inst.air_temperature;
+            if (inst.air_temperature > maxTemp) maxTemp = inst.air_temperature;
+
+            const sym = (pts[p].data.next_6_hours && pts[p].data.next_6_hours.summary)
+                ? pts[p].data.next_6_hours.summary.symbol_code
+                : (pts[p].data.next_12_hours && pts[p].data.next_12_hours.summary
+                    ? pts[p].data.next_12_hours.summary.symbol_code : 'fair_day');
+            const parsed = this._parseMetSymbol(sym);
+            symCounts[parsed.base] = (symCounts[parsed.base] || 0) + 1;
+        }
+
+        // Most common symbol for the day
+        let bestSym = 'fair';
+        let bestCount = 0;
+        for (const s in symCounts) {
+            if (symCounts[s] > bestCount) { bestCount = symCounts[s]; bestSym = s; }
+        }
+
+        const wmoCode = SYMBOL_TO_WMO[bestSym] !== undefined ? SYMBOL_TO_WMO[bestSym] : 0;
+        const owmId = Utils.wmoToOwmId(wmoCode);
+
+        const parts = key.split('-');
+        const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        const dayLabel = Utils._dayName(dt, lang);
+
+        list.push({
+            dt: Math.floor(dt.getTime() / 1000),
+            day: dayLabel,
+            temp_min: minTemp === Infinity ? null : minTemp,
+            temp_max: maxTemp === -Infinity ? null : maxTemp,
+            weather_code: wmoCode,
+            weather: [{ icon: _iconNum(owmId) + 'd', id: owmId }]
+        });
     }
 
     return list.length > 0 ? list : null;

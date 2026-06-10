@@ -82,6 +82,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this.settings.bindProperty(Settings.BindingDirection.IN, 'opacity', 'opacity', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'width', 'width', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'language', 'language', this._onSettingsChanged.bind(this));
+        this.settings.bindProperty(Settings.BindingDirection.IN, 'api-provider', 'apiProvider', this._onSettingsChanged.bind(this));
 
         this._buildUI();
         this._onSettingsChanged();
@@ -168,6 +169,8 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         if (this.theme === 'Nature (green/earth tones)') this.theme = 'nature';
         if (this.language === 'English') this.language = 'en';
         if (this.language === 'Русский') this.language = 'ru';
+        if (this.apiProvider === 'Open-Meteo') this.apiProvider = 'open-meteo';
+        if (this.apiProvider === 'MET Norway (yr.no)') this.apiProvider = 'met-norway';
 
         if (this._width !== this.width) {
             this._width = Math.max(200, Math.min(600, this.width));
@@ -230,6 +233,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
             this.location,
             this.language,
             Lang.bind(this, function (lat, lon, name, country) {
+                this._weatherService._provider = this.apiProvider || 'met-norway';
                 this._weatherService.fetchWeather(
                     lat, lon, name, country,
                     this.units, this.language,
