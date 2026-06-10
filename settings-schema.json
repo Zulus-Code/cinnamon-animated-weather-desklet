@@ -48,7 +48,17 @@
     "show-forecast": {
         "type": "switch",
         "default": true,
-        "description": "Show hourly forecast strip"
+        "description": "Show forecast strip"
+    },
+    "forecast-type": {
+        "type": "combobox",
+        "default": "daily",
+        "description": "Forecast mode",
+        "options": {
+            "daily": "Daily (3-5 days)",
+            "hourly": "Hourly (up to 24h)"
+        },
+        "dependency": "show-forecast"
     },
     "forecast-hours": {
         "type": "spinbutton",
@@ -57,7 +67,7 @@
         "max": 24,
         "units": "hours",
         "step": 3,
-        "description": "Forecast range",
+        "description": "Hourly forecast range",
         "dependency": "show-forecast"
     },
     "show-background": {

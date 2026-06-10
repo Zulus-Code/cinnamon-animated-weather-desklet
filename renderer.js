@@ -1,4 +1,6 @@
-/* renderer.js — Cairo/Pango renderer for weather-animated@zulus
+/**
+ * @file renderer.js — Cairo/Pango renderer for weather-animated@zulus
+ * @module renderer
  *
  * Procedural sky rendering with multi-layer clouds, sun/moon, and fog.
  * Uses SceneBuilder scene parameters for visual state.
@@ -12,6 +14,13 @@ const Constants = imports.constants;
 const Utils = imports.utils;
 
 /* ── Renderer constructor ────────────────────────────────────────────────── */
+
+/**
+ * Create a Renderer instance.
+ * @constructor
+ * @param {Object} desklet - The AnimatedWeatherDesklet instance
+ * @returns {void}
+ */
 function Renderer(desklet) {
     this._d = desklet;
 
@@ -32,6 +41,12 @@ function Renderer(desklet) {
 }
 
 /* ── Set noise texture reference (called by desklet after SceneBuilder init) ── */
+
+/**
+ * Set the noise texture reference for cloud/fog rendering.
+ * @param {Object} noiseTex - NoiseTexture instance
+ * @returns {void}
+ */
 Renderer.prototype.setNoiseTexture = function (noiseTex) {
     this._noiseTex = noiseTex;
 };
@@ -40,10 +55,14 @@ Renderer.prototype.setNoiseTexture = function (noiseTex) {
  *  THEME COLOURS (unchanged from original)
  * ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Get theme colours based on current desklet settings.
+ * @returns {Object} Theme colour object with isDark, text, dim, faint, err
+ */
 Renderer.prototype._themeColors = function () {
-    let d = this._d;
-    let t = d.theme || 'auto';
-    let isDark = (t === 'dark') || (t === 'auto' && d._isNight());
+    const d = this._d;
+    const t = d.theme || 'auto';
+    const isDark = (t === 'dark') || (t === 'auto' && d._isNight());
 
     switch (t) {
         case 'warm':
@@ -85,14 +104,19 @@ Renderer.prototype._themeColors = function () {
  *  MAIN DRAW ENTRY POINT
  * ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Main draw entry point. Renders the full desklet scene.
+ * @param {Object} area - St.DrawingArea to draw on
+ * @returns {void}
+ */
 Renderer.prototype.draw = function (area) {
-    let cr = area.get_context();
-    let d = this._d;
-    let w = d._width, h = d._height;
+    const cr = area.get_context();
+    const d = this._d;
+    const w = d._width, h = d._height;
     if (w < 50 || h < 50) return;
 
     // Internal time keeping (for fog animation etc.)
-    let now = Date.now();
+    const now = Date.now();
     if (this._lastDrawTime) {
         this._time += (now - this._lastDrawTime) / 1000;
         if (this._time > 10000) this._time = 0; // prevent overflow
@@ -110,14 +134,14 @@ Renderer.prototype.draw = function (area) {
     // ── Sky background (gradient) — only when background ON ──
     if (d.showBackground !== false) {
         try {
-            let scene = d._scene || null;
+            const scene = d._scene || null;
             this._drawProceduralSky(cr, w, h, scene || null);
         } catch (e) { global.logError('Draw procedural sky error: ' + e); }
     }
 
     // ── Sun / Moon — ALWAYS drawn (even on transparent background) ──
     try {
-        let scene = d._scene || null;
+        const scene = d._scene || null;
         if (scene) {
             this._drawSunMoon(cr, w, h, scene);
         } else {
@@ -127,7 +151,7 @@ Renderer.prototype.draw = function (area) {
 
     // ── Clouds — ALWAYS drawn ──
     try {
-        let scene = d._scene || null;
+        const scene = d._scene || null;
         if (scene) {
             this._drawClouds(cr, w, h, scene);
             // Fog overlay (part of sky scene)
@@ -139,7 +163,7 @@ Renderer.prototype.draw = function (area) {
 
     // ── Rainbow — drawn when conditions are right ──
     try {
-        let scene = d._scene || null;
+        const scene = d._scene || null;
         if (scene && d.showBackground !== false) {
             this._drawRainbow(cr, w, h, scene);
         }
@@ -147,7 +171,7 @@ Renderer.prototype.draw = function (area) {
 
     // ── Lightning flash — drawn on top of everything ──
     try {
-        let scene = d._scene || null;
+        const scene = d._scene || null;
         if (scene) {
             this._drawLightning(cr, w, h, scene);
         }
@@ -171,7 +195,12 @@ Renderer.prototype.draw = function (area) {
         else if (d._error) this._drawError(cr, w, h, d._error);
         else if (d._weather) {
             this._drawWeather(cr, w);
-            if (d.showForecast && d._forecast) this._drawForecast(cr, w);
+            if (d.showForecast) {
+                const ft = d.forecastType || 'daily';
+                if (ft === 'hourly' && d._forecast) this._drawForecast(cr, w);
+                else if (ft === 'daily' && d._dailyForecast) this._drawDailyForecast(cr, w);
+                else if (d._forecast) this._drawForecast(cr, w); // fallback
+            }
         }
     } catch (e) { global.logError('Draw UI error: ' + e); }
 
@@ -183,11 +212,17 @@ Renderer.prototype.draw = function (area) {
  *  PROCEDURAL SCENE DRAWING
  * ══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Fallback for when scene is not ready ───────────────────────────────── */
+/**
+ * Fallback sky rendering when scene data is not ready.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @param {number} h - Desklet height
+ * @returns {void}
+ */
 Renderer.prototype._drawSimpleFallback = function (cr, w, h) {
-    let d = this._d;
-    let wid = d._weather ? d._weather.weather[0].id : 800;
-    let night = d._isNight();
+    const d = this._d;
+    const wid = d._weather ? d._weather.weather[0].id : 800;
+    const night = d._isNight();
     let c;
     if (wid >= 200 && wid < 300) c = Constants.COLORS.sky.stormy;
     else if (wid >= 300 && wid < 600) c = night ? Constants.COLORS.sky.rainy_night : Constants.COLORS.sky.rainy_day;
@@ -197,8 +232,8 @@ Renderer.prototype._drawSimpleFallback = function (cr, w, h) {
     else if (wid >= 801) c = night ? Constants.COLORS.sky.cloudy_night : Constants.COLORS.sky.cloudy_day;
     else c = night ? Constants.COLORS.sky.stormy : Constants.COLORS.sky.cloudy_day;
 
-    let pat = new Cairo.LinearGradient(0, 0, 0, h);
-    let c1 = Utils._hexToRgba(c[0]), c2 = Utils._hexToRgba(c[1]);
+    const pat = new Cairo.LinearGradient(0, 0, 0, h);
+    const c1 = Utils._hexToRgba(c[0]), c2 = Utils._hexToRgba(c[1]);
     pat.addColorStopRGBA(0, c1[0], c1[1], c1[2], 1);
     pat.addColorStopRGBA(1, c2[0], c2[1], c2[2], 1);
     cr.setSource(pat);
@@ -211,16 +246,24 @@ Renderer.prototype._drawSimpleFallback = function (cr, w, h) {
  *  Multi-stop gradient adapting to time of day, weather, and sun position
  * ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Draw the procedural sky gradient.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @param {number} h - Desklet height
+ * @param {Object} scene - Scene parameters object
+ * @returns {void}
+ */
 Renderer.prototype._drawProceduralSky = function (cr, w, h, scene) {
     // ── Three-stop vertical gradient ──
     // Top → Mid → Bottom (horizon)
     // Additional horizon glow near the bottom
 
-    let top = scene.skyTopColor;
-    let mid = scene.skyMidColor;
-    let bot = scene.skyBottomColor;
+    const top = scene.skyTopColor;
+    const mid = scene.skyMidColor;
+    const bot = scene.skyBottomColor;
 
-    let pat = new Cairo.LinearGradient(0, 0, 0, h);
+    const pat = new Cairo.LinearGradient(0, 0, 0, h);
 
     // Top third: sky top color
     pat.addColorStopRGBA(0, top[0], top[1], top[2], 1);
@@ -230,7 +273,7 @@ Renderer.prototype._drawProceduralSky = function (cr, w, h, scene) {
     pat.addColorStopRGBA(0.75, bot[0], bot[1], bot[2], 1);
 
     // Horizon glow strip at the very bottom
-    let glow = scene.horizonGlow || bot;
+    const glow = scene.horizonGlow || bot;
     pat.addColorStopRGBA(0.92, glow[0], glow[1], glow[2], 0.8);
     pat.addColorStopRGBA(1, glow[0], glow[1], glow[2], 1);
 
@@ -244,17 +287,25 @@ Renderer.prototype._drawProceduralSky = function (cr, w, h, scene) {
  *  Procedural rendering with radial gradients and glow
  * ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Draw the sun or moon with glow effects.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @param {number} h - Desklet height
+ * @param {Object} scene - Scene parameters object
+ * @returns {void}
+ */
 Renderer.prototype._drawSunMoon = function (cr, w, h, scene) {
     if (scene.sunElevation < -5 && !scene.isNight) return; // below horizon
 
     // Calculate sun/moon position — now in TOP-RIGHT corner
     if (scene.isNight || scene.sunElevation < -2) {
         // ── DRAW MOON ──
-        let moonEl = scene.moonElevation || 40;
+        const moonEl = scene.moonElevation || 40;
         // Moon in top-right: X near right edge, Y high
-        let moonX = w - Math.min(w * 0.12, 45);
-        let moonY = Math.min(h * 0.08, 30) + (1 - (moonEl + 10) / 80) * 20;
-        let moonR = Math.min(w, h) * 0.035;
+        const moonX = w - Math.min(w * 0.12, 45);
+        const moonY = Math.min(h * 0.08, 30) + (1 - (moonEl + 10) / 80) * 20;
+        const moonR = Math.min(w, h) * 0.035;
 
         if (scene.moonVisible) {
             this._drawMoon(cr, moonX, moonY, moonR, scene);
@@ -263,21 +314,21 @@ Renderer.prototype._drawSunMoon = function (cr, w, h, scene) {
     }
 
     // ── DRAW SUN — top-right corner ──
-    let sunEl = scene.sunElevation;
+    const sunEl = scene.sunElevation;
     if (sunEl <= 0) return;
     // Y position: smooth arc, anchored in top-right
-    let sunBaseY = Math.min(h * 0.08, 30);
-    let sunHorizonY = h * 0.55;
-    let sunY = sunBaseY + (sunHorizonY - sunBaseY) * (1 - sunEl / 90);
-    let sunR = Math.min(w, h) * (0.035 + 0.02 * (1 - sunEl / 90));
+    const sunBaseY = Math.min(h * 0.08, 30);
+    const sunHorizonY = h * 0.55;
+    const sunY = sunBaseY + (sunHorizonY - sunBaseY) * (1 - sunEl / 90);
+    const sunR = Math.min(w, h) * (0.035 + 0.02 * (1 - sunEl / 90));
 
     // X position: fixed near right edge, slight horizontal drift
-    let sunX = w - Math.min(w * 0.12, 45) + Math.sin(sunEl / 90 * Math.PI) * 8;
+    const sunX = w - Math.min(w * 0.12, 45) + Math.sin(sunEl / 90 * Math.PI) * 8;
 
     // Sun glow (outer)
-    let glowR = sunR * 5;
-    let glow = new Cairo.RadialGradient(sunX, sunY, sunR * 0.5, sunX, sunY, glowR);
-    let c = scene.sunGlowColor;
+    const glowR = sunR * 5;
+    const glow = new Cairo.RadialGradient(sunX, sunY, sunR * 0.5, sunX, sunY, glowR);
+    const c = scene.sunGlowColor;
     glow.addColorStopRGBA(0, c[0], c[1], c[2], 0.4);
     glow.addColorStopRGBA(0.3, c[0], c[1], c[2], 0.15);
     glow.addColorStopRGBA(0.7, c[0], c[1], c[2], 0.04);
@@ -287,9 +338,9 @@ Renderer.prototype._drawSunMoon = function (cr, w, h, scene) {
     cr.fill();
 
     // Sun inner glow
-    let innerR = sunR * 2.5;
-    let inner = new Cairo.RadialGradient(sunX, sunY, 0, sunX, sunY, innerR);
-    let sc = scene.sunColor;
+    const innerR = sunR * 2.5;
+    const inner = new Cairo.RadialGradient(sunX, sunY, 0, sunX, sunY, innerR);
+    const sc = scene.sunColor;
     inner.addColorStopRGBA(0, 1, 1, 1, 1);
     inner.addColorStopRGBA(0.15, sc[0], sc[1], sc[2], 0.9);
     inner.addColorStopRGBA(0.6, sc[0], sc[1], sc[2], 0.3);
@@ -304,8 +355,8 @@ Renderer.prototype._drawSunMoon = function (cr, w, h, scene) {
     cr.fill();
 
     // Sun disk warm center
-    let disk = new Cairo.RadialGradient(sunX - sunR * 0.2, sunY - sunR * 0.2, 0,
-                                        sunX, sunY, sunR);
+    const disk = new Cairo.RadialGradient(sunX - sunR * 0.2, sunY - sunR * 0.2, 0,
+        sunX, sunY, sunR);
     disk.addColorStopRGBA(0, 1, 1, 1, 1);
     disk.addColorStopRGBA(0.5, sc[0], sc[1], sc[2], 0.8);
     disk.addColorStopRGBA(1, sc[0], sc[1], sc[2], 0.3);
@@ -315,8 +366,8 @@ Renderer.prototype._drawSunMoon = function (cr, w, h, scene) {
 
     // ── Atmospheric halo around the sun (aerial perspective) ──
     if (sunEl < 30) {
-        let halo = new Cairo.RadialGradient(sunX, sunY, sunR, sunX, sunY, sunR * 8);
-        let hc = scene.sunGlowColor;
+        const halo = new Cairo.RadialGradient(sunX, sunY, sunR, sunX, sunY, sunR * 8);
+        const hc = scene.sunGlowColor;
         halo.addColorStopRGBA(0, hc[0], hc[1], hc[2], 0.08);
         halo.addColorStopRGBA(0.5, hc[0], hc[1], hc[2], 0.03);
         halo.addColorStopRGBA(1, hc[0], hc[1], hc[2], 0);
@@ -327,9 +378,9 @@ Renderer.prototype._drawSunMoon = function (cr, w, h, scene) {
 
     // ── Horizon glow at sunrise/sunset ──
     if (sunEl < 15 && sunEl > 0) {
-        let factor = (15 - sunEl) / 15;
-        let hGlow = new Cairo.LinearGradient(0, h * 0.7, 0, h);
-        let hc = [1.0, 0.6 - factor * 0.3, 0.2 - factor * 0.2];
+        const factor = (15 - sunEl) / 15;
+        const hGlow = new Cairo.LinearGradient(0, h * 0.7, 0, h);
+        const hc = [1.0, 0.6 - factor * 0.3, 0.2 - factor * 0.2];
         hGlow.addColorStopRGBA(0, hc[0], hc[1], hc[2], 0);
         hGlow.addColorStopRGBA(0.3, hc[0], hc[1], hc[2], 0.05 * factor);
         hGlow.addColorStopRGBA(0.7, hc[0], hc[1], hc[2], 0.15 * factor);
@@ -340,11 +391,19 @@ Renderer.prototype._drawSunMoon = function (cr, w, h, scene) {
     }
 };
 
-/* ── Moon rendering ─────────────────────────────────────────────────────── */
+/**
+ * Draw the moon with phase shadow and glow.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} x - Moon X position
+ * @param {number} y - Moon Y position
+ * @param {number} r - Moon radius
+ * @param {Object} scene - Scene parameters object
+ * @returns {void}
+ */
 Renderer.prototype._drawMoon = function (cr, x, y, r, scene) {
     // Moon glow
-    let glowR = r * 4;
-    let glow = new Cairo.RadialGradient(x, y, r * 0.3, x, y, glowR);
+    const glowR = r * 4;
+    const glow = new Cairo.RadialGradient(x, y, r * 0.3, x, y, glowR);
     glow.addColorStopRGBA(0, 0.6, 0.7, 1.0, 0.15);
     glow.addColorStopRGBA(0.4, 0.5, 0.6, 0.9, 0.06);
     glow.addColorStopRGBA(1, 0.4, 0.5, 0.8, 0);
@@ -358,7 +417,7 @@ Renderer.prototype._drawMoon = function (cr, x, y, r, scene) {
     cr.fill();
 
     // Moon phase (crescent effect using shadow circle)
-    let phase = scene.moonPhase || 0;
+    const phase = scene.moonPhase || 0;
     // phase 0 = new moon, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter
     // Map to shadow offset: 0→-2r (full shadow = new moon), 0.5→0 (no shadow = full)
     if (Math.abs(phase - 0.5) > 0.02) {
@@ -386,34 +445,51 @@ Renderer.prototype._drawMoon = function (cr, x, y, r, scene) {
  *  Three parallax cloud layers using noise texture as mask
  * ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Draw three layers of parallax clouds.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @param {number} h - Desklet height
+ * @param {Object} scene - Scene parameters object
+ * @returns {void}
+ */
 Renderer.prototype._drawClouds = function (cr, w, h, scene) {
     if (!this._noiseTex) return;
 
     // Draw layers from far to near (back to front)
     for (let layer = 0; layer < 3; layer++) {
-        let opacity = scene.cloudOpacity[layer];
+        const opacity = scene.cloudOpacity[layer];
         if (opacity < 0.01) continue;
 
         this._drawCloudLayer(cr, w, h, scene, layer);
     }
 };
 
+/**
+ * Draw a single cloud layer using noise mask.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @param {number} h - Desklet height
+ * @param {Object} scene - Scene parameters object
+ * @param {number} layer - Cloud layer index (0-2)
+ * @returns {void}
+ */
 Renderer.prototype._drawCloudLayer = function (cr, w, h, scene, layer) {
-    let noiseTex = this._noiseTex;
-    let noiseSurface = noiseTex.getSurface();
+    const noiseTex = this._noiseTex;
+    const noiseSurface = noiseTex.getSurface();
     if (!noiseSurface) return;
 
-    let density = scene.cloudDensity[layer];
-    let scale = scene.cloudScale[layer];
-    let offset = (scene.cloudOffsets && scene.cloudOffsets[layer]) || 0;
-    let opacity = scene.cloudOpacity[layer];
+    const density = scene.cloudDensity[layer];
+    const scale = scene.cloudScale[layer];
+    const offset = (scene.cloudOffsets && scene.cloudOffsets[layer]) || 0;
+    const opacity = scene.cloudOpacity[layer];
 
     // Get or create cloud mask surface for this density
-    let mask = this._getCloudMask(noiseTex, density, layer);
+    const mask = this._getCloudMask(noiseTex, density, layer);
     if (!mask) return;
 
     // Build cloud color: white/grey with slight blue or warm tint based on scene
-    let isNight = scene.isNight;
+    const isNight = scene.isNight;
     let col;
     if (isNight) {
         col = [0.15, 0.15, 0.20]; // dark clouds at night
@@ -423,14 +499,14 @@ Renderer.prototype._drawCloudLayer = function (cr, w, h, scene, layer) {
         col = [0.55, 0.58, 0.65]; // snowy grey
     } else if (scene.sunElevation > 0 && scene.sunElevation < 20) {
         // Sunset: warm clouds
-        let sf = (20 - scene.sunElevation) / 20;
+        const sf = (20 - scene.sunElevation) / 20;
         col = [0.8 + sf * 0.2, 0.6 + sf * 0.1, 0.5 - sf * 0.2];
     } else {
         col = [0.75, 0.78, 0.85]; // default white-grey
     }
 
     // Apply scene ambient light to cloud color
-    let amb = scene.ambientLight;
+    const amb = scene.ambientLight;
     col[0] *= amb[0];
     col[1] *= amb[1];
     col[2] *= amb[2];
@@ -440,25 +516,25 @@ Renderer.prototype._drawCloudLayer = function (cr, w, h, scene, layer) {
     // Set up the mask pattern
     let pattern;
     try { pattern = new Cairo.Pattern(mask); } catch (e) {
-        try { pattern = Cairo.Pattern.createForSurface(mask); } catch (e2) { return; }
+        try { pattern = Cairo.Pattern.createForSurface(mask); } catch (e) { cr.restore(); return; }
     }
     try { pattern.setExtend(Cairo.Extend.REPEAT); } catch (e) {}
 
     // Create transform matrix: scale for parallax + scroll for animation
     // Base scale: map 256px noise texture to screen with parallax factor
-    let px = layer === 0 ? 1.5 : (layer === 1 ? 1.0 : 0.6);
-    let sx = w / 256 * (1 / scale) * px;
-    let sy = h / 256 * (1 / scale) * px;
+    const px = layer === 0 ? 1.5 : (layer === 1 ? 1.0 : 0.6);
+    const sx = w / 256 * (1 / scale) * px;
+    const sy = h / 256 * (1 / scale) * px;
 
-    let tx = offset * 80; // Scroll offset
-    let ty = layer * 15 + offset * 5; // Vertical offset per layer
+    const tx = offset * 80; // Scroll offset
+    const ty = layer * 15 + offset * 5; // Vertical offset per layer
 
     try {
-        let matrix = new Cairo.Matrix(sx, 0, 0, sy, tx, ty);
+        const matrix = new Cairo.Matrix(sx, 0, 0, sy, tx, ty);
         pattern.setMatrix(matrix);
     } catch (e) {
         // Cairo.Matrix not available in this version — use translate hack
-        try { cr.setSourceSurface(mask, tx % 256, ty % 256); } catch (e2) {}
+        try { cr.setSourceSurface(mask, tx % 256, ty % 256); } catch (e) {}
     }
 
     // Apply the cloud mask with the cloud color
@@ -468,7 +544,13 @@ Renderer.prototype._drawCloudLayer = function (cr, w, h, scene, layer) {
     cr.restore();
 };
 
-/* ── Get or create a cloud mask surface for a given density ─────────────── */
+/**
+ * Get or create a cached cloud mask surface for a given density.
+ * @param {Object} noiseTex - NoiseTexture instance
+ * @param {number} density - Cloud density [0, 1]
+ * @param {number} layer - Cloud layer index (0-2)
+ * @returns {Cairo.ImageSurface|null} Cloud mask surface or null
+ */
 Renderer.prototype._getCloudMask = function (noiseTex, density, layer) {
     // Regenerate if density changed significantly
     if (this._cloudMasks[layer] === null ||
@@ -480,9 +562,14 @@ Renderer.prototype._getCloudMask = function (noiseTex, density, layer) {
     return this._cloudMasks[layer];
 };
 
-/* ── Generate a cloud mask surface from noise data with thresholding ── */
+/**
+ * Generate a cloud mask surface from noise data with thresholding.
+ * @param {Object} noiseTex - NoiseTexture instance
+ * @param {number} density - Cloud density [0, 1]
+ * @returns {Cairo.ImageSurface|null} Cloud mask surface or null
+ */
 Renderer.prototype._generateCloudMask = function (noiseTex, density) {
-    let size = 256;
+    const size = 256;
     let surface;
     let isA8 = false;
 
@@ -493,7 +580,7 @@ Renderer.prototype._generateCloudMask = function (noiseTex, density) {
     } catch (e) {
         try {
             surface = new Cairo.ImageSurface(Cairo.Format.ARGB32, size, size);
-        } catch (e2) {
+        } catch (e) {
             return null;
         }
     }
@@ -512,7 +599,7 @@ Renderer.prototype._generateCloudMask = function (noiseTex, density) {
         // Fast path: write directly to A8 surface data
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                let cloudVal = this._computeCloudMaskValue(noiseTex, x, y, density);
+                const cloudVal = this._computeCloudMaskValue(noiseTex, x, y, density);
                 data[y * size + x] = cloudVal;
             }
         }
@@ -520,8 +607,8 @@ Renderer.prototype._generateCloudMask = function (noiseTex, density) {
         // Fast path: write directly to ARGB32 surface data
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                let cloudVal = this._computeCloudMaskValue(noiseTex, x, y, density);
-                let offset = (y * size + x) * 4;
+                const cloudVal = this._computeCloudMaskValue(noiseTex, x, y, density);
+                const offset = (y * size + x) * 4;
                 data[offset]     = cloudVal; // B
                 data[offset + 1] = cloudVal; // G
                 data[offset + 2] = cloudVal; // R
@@ -530,11 +617,11 @@ Renderer.prototype._generateCloudMask = function (noiseTex, density) {
         }
     } else {
         // Slow fallback: per-pixel Cairo drawing
-        let cr = new Cairo.Context(surface);
+        const cr = new Cairo.Context(surface);
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                let cloudVal = this._computeCloudMaskValue(noiseTex, x, y, density);
-                let v = cloudVal / 255;
+                const cloudVal = this._computeCloudMaskValue(noiseTex, x, y, density);
+                const v = cloudVal / 255;
                 cr.setSourceRGBA(v, v, v, v);
                 cr.rectangle(x, y, 1, 1);
                 cr.fill();
@@ -547,13 +634,20 @@ Renderer.prototype._generateCloudMask = function (noiseTex, density) {
     return surface;
 };
 
-/* ── Compute single cloud mask pixel value (shared logic) ───────────────── */
+/**
+ * Compute a single cloud mask pixel value.
+ * @param {Object} noiseTex - NoiseTexture instance
+ * @param {number} x - Pixel X coordinate
+ * @param {number} y - Pixel Y coordinate
+ * @param {number} density - Cloud density [0, 1]
+ * @returns {number} Byte value (0-255) for the mask pixel
+ */
 Renderer.prototype._computeCloudMaskValue = function (noiseTex, x, y, density) {
     // Sample noise and apply density threshold
-    let noiseVal = noiseTex.sample(x, y);
+    const noiseVal = noiseTex.sample(x, y);
     // noiseVal is in [-1, 1], threshold based on density
     // Higher density = lower threshold = more cloud
-    let threshold = 0.6 - density * 0.5;
+    const threshold = 0.6 - density * 0.5;
     let cloudVal;
     if (noiseVal > threshold) {
         cloudVal = Math.min(255, Math.floor((noiseVal - threshold) /
@@ -564,7 +658,7 @@ Renderer.prototype._computeCloudMaskValue = function (noiseTex, x, y, density) {
 
     // Add some texture variation at the edges
     if (cloudVal > 0 && cloudVal < 255) {
-        let noise2 = noiseTex.sample(x * 3 + 50, y * 3 + 50);
+        const noise2 = noiseTex.sample(x * 3 + 50, y * 3 + 50);
         cloudVal = Math.floor(cloudVal * (0.7 + 0.3 * (noise2 + 1) / 2));
         cloudVal = Math.max(0, Math.min(255, cloudVal));
     }
@@ -577,8 +671,16 @@ Renderer.prototype._computeCloudMaskValue = function (noiseTex, x, y, density) {
  *  Non-uniform fog using noise texture
  * ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Draw procedural fog using noise texture.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @param {number} h - Desklet height
+ * @param {Object} scene - Scene parameters object
+ * @returns {void}
+ */
 Renderer.prototype._drawFog = function (cr, w, h, scene) {
-    let fogInt = scene.fogIntensity;
+    const fogInt = scene.fogIntensity;
     if (fogInt < 0.02) return;
 
     // Regenerate fog mask if intensity changed
@@ -589,7 +691,7 @@ Renderer.prototype._drawFog = function (cr, w, h, scene) {
 
     if (!this._fogMask) {
         // Simple uniform fog fallback
-        let fogColor = scene.isNight ? [0.05, 0.05, 0.10] : [0.6, 0.65, 0.72];
+        const fogColor = scene.isNight ? [0.05, 0.05, 0.10] : [0.6, 0.65, 0.72];
         cr.setSourceRGBA(fogColor[0], fogColor[1], fogColor[2], fogInt * 0.3);
         cr.rectangle(0, 0, w, h);
         cr.fill();
@@ -599,27 +701,31 @@ Renderer.prototype._drawFog = function (cr, w, h, scene) {
     // Create pattern from fog mask
     let pattern;
     try { pattern = new Cairo.Pattern(this._fogMask); } catch (e) {
-        try { pattern = Cairo.Pattern.createForSurface(this._fogMask); } catch (e2) { return; }
+        try { pattern = Cairo.Pattern.createForSurface(this._fogMask); } catch (e) { return; }
     }
     try { pattern.setExtend(Cairo.Extend.REPEAT); } catch (e) {}
 
     // Slow drift for the fog
-    let time = this._time;
-    let tx = time * 2;
-    let ty = time * 0.5;
+    const time = this._time;
+    const tx = time * 2;
+    const ty = time * 0.5;
     try {
-        let matrix = new Cairo.Matrix(w / 256 * 3, 0, 0, h / 256 * 3, tx, ty);
+        const matrix = new Cairo.Matrix(w / 256 * 3, 0, 0, h / 256 * 3, tx, ty);
         pattern.setMatrix(matrix);
     } catch (e) {}
 
-    let fogColor = scene.isNight ? [0.05, 0.05, 0.10] : [0.55, 0.60, 0.68];
+    const fogColor = scene.isNight ? [0.05, 0.05, 0.10] : [0.55, 0.60, 0.68];
     cr.setSourceRGBA(fogColor[0], fogColor[1], fogColor[2], fogInt * 0.35);
     cr.mask(pattern);
 };
 
-/* ── Generate fog density mask ──────────────────────────────────────────── */
+/**
+ * Generate a fog density mask surface.
+ * @param {number} intensity - Fog intensity [0, 1]
+ * @returns {Cairo.ImageSurface|null} Fog mask surface or null
+ */
 Renderer.prototype._generateFogMask = function (intensity) {
-    let size = 256;
+    const size = 256;
     let surface;
     let isA8 = false;
 
@@ -629,12 +735,12 @@ Renderer.prototype._generateFogMask = function (intensity) {
     } catch (e) {
         try {
             surface = new Cairo.ImageSurface(Cairo.Format.ARGB32, size, size);
-        } catch (e2) {
+        } catch (e) {
             return null;
         }
     }
 
-    let noiseTex = this._noiseTex;
+    const noiseTex = this._noiseTex;
     if (!noiseTex) return null;
 
     // Try direct data write first
@@ -648,18 +754,18 @@ Renderer.prototype._generateFogMask = function (intensity) {
     for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
             // Fog uses fBm sample with lower frequency for wispy look
-            let val = noiseTex.fBmSample(x / size * 4, y / size * 4, 3);
+            const val = noiseTex.fBmSample(x / size * 4, y / size * 4, 3);
             // Remap: fog is visible where noise > threshold
             let fogVal = (val + 1) * 0.5; // [0, 1]
             // Fog threshold: intensity controls how much fog there is
-            let threshold = 0.7 - intensity * 0.3;
+            const threshold = 0.7 - intensity * 0.3;
             if (fogVal > threshold) {
                 fogVal = Math.min(1, (fogVal - threshold) / (1 - threshold));
             } else {
                 fogVal = 0;
             }
             // Bottom-heavy (more fog near ground)
-            let vertical = (size - y) / size;
+            const vertical = (size - y) / size;
             fogVal *= (0.3 + 0.7 * vertical);
 
             let byteVal = Math.floor(fogVal * 255 * intensity * 1.2);
@@ -669,7 +775,7 @@ Renderer.prototype._generateFogMask = function (intensity) {
                 if (isA8) {
                     data[y * size + x] = byteVal;
                 } else {
-                    let offset = (y * size + x) * 4;
+                    const offset = (y * size + x) * 4;
                     data[offset]     = byteVal;
                     data[offset + 1] = byteVal;
                     data[offset + 2] = byteVal;
@@ -690,13 +796,21 @@ Renderer.prototype._generateFogMask = function (intensity) {
  *  GLASS PANEL (dynamic scene-adaptive tinting)
  * ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Draw the glass panel overlay with scene-adaptive tinting.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @param {number} h - Desklet height
+ * @param {Object|null} scene - Scene parameters object or null
+ * @returns {void}
+ */
 Renderer.prototype._drawGlassPanel = function (cr, w, h, scene) {
-    let d = this._d;
-    let isDark = this._themeColors().isDark;
+    const d = this._d;
+    const isDark = this._themeColors().isDark;
 
-    let o = (d.opacity || 70) / 100;
-    let pad = 20, r = 20;
-    let pH = h - pad * 2, pY = pad;
+    const o = (d.opacity || 70) / 100;
+    const pad = 20, r = 20;
+    const pH = h - pad * 2, pY = pad;
 
     // ── Scene-adaptive tint ──
     let tint = [1, 1, 1]; // default white
@@ -710,12 +824,12 @@ Renderer.prototype._drawGlassPanel = function (cr, w, h, scene) {
     cr.fill();
 
     // Main glass fill with scene tint
-    let glassDark = [
+    const glassDark = [
         0.039 * tint[0],
         0.039 * tint[1],
         0.118 * tint[2]
     ];
-    let glassLight = [
+    const glassLight = [
         1.0 * tint[0],
         1.0 * tint[1],
         1.0 * tint[2]
@@ -735,7 +849,7 @@ Renderer.prototype._drawGlassPanel = function (cr, w, h, scene) {
     cr.fill();
 
     // Border with scene-tinted color
-    let border = isDark
+    const border = isDark
         ? [0.392 * tint[0], 0.549 * tint[1], 1.0 * tint[2]]
         : [1.0 * tint[0], 1.0 * tint[1], 1.0 * tint[2]];
 
@@ -761,6 +875,14 @@ Renderer.prototype._drawGlassPanel = function (cr, w, h, scene) {
  *  LIGHTNING FLASH (thunderstorm effect)
  * ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Draw lightning flash effect for thunderstorm weather.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @param {number} h - Desklet height
+ * @param {Object} scene - Scene parameters object
+ * @returns {void}
+ */
 Renderer.prototype._drawLightning = function (cr, w, h, scene) {
     if (scene.precipitationType !== 'thunder' && scene.precipitationType !== 'hail') {
         this._lightningTimer = 0;
@@ -791,7 +913,7 @@ Renderer.prototype._drawLightning = function (cr, w, h, scene) {
 
     if (this._lightningAlpha > 0.01) {
         // Full-screen white flash with slight blue tint
-        let a = this._lightningAlpha;
+        const a = this._lightningAlpha;
         cr.setSourceRGBA(1, 1, 1, a * 0.15);
         cr.rectangle(0, 0, w, h);
         cr.fill();
@@ -809,12 +931,20 @@ Renderer.prototype._drawLightning = function (cr, w, h, scene) {
  *  RAINBOW EFFECT (appears when sun is low + light rain)
  * ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Draw a rainbow arc when conditions are right (low sun + light rain).
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @param {number} h - Desklet height
+ * @param {Object} scene - Scene parameters object
+ * @returns {void}
+ */
 Renderer.prototype._drawRainbow = function (cr, w, h, scene) {
     // Rainbow conditions: sun low (5-35°), light rain or just after rain
-    let sunEl = scene.sunElevation;
-    let isRainy = (scene.precipitationType === 'rain' || scene.precipitationType === 'drizzle');
-    let lightPrecip = scene.precipitation < 0.6;
-    let sunnyEnough = sunEl > 5 && sunEl < 35;
+    const sunEl = scene.sunElevation;
+    const isRainy = (scene.precipitationType === 'rain' || scene.precipitationType === 'drizzle');
+    const lightPrecip = scene.precipitation < 0.6;
+    const sunnyEnough = sunEl > 5 && sunEl < 35;
 
     if (!sunnyEnough || !isRainy || !lightPrecip) return;
 
@@ -824,16 +954,16 @@ Renderer.prototype._drawRainbow = function (cr, w, h, scene) {
     intensity = Math.min(1, intensity) * 0.35; // max 35% opacity
 
     // Rainbow arc in the lower-left area of the desklet
-    let cx = w * 0.3;
-    let cy = h * 0.85;
-    let r1 = Math.min(w, h) * 0.35;
-    let r2 = r1 * 0.85; // inner radius
-    let r3 = r1 * 0.90;
-    let r4 = r1 * 0.95;
-    let r5 = r1 * 1.0;
+    const cx = w * 0.3;
+    const cy = h * 0.85;
+    const r1 = Math.min(w, h) * 0.35;
+    const r2 = r1 * 0.85; // inner radius
+    const r3 = r1 * 0.90;
+    const r4 = r1 * 0.95;
+    const r5 = r1 * 1.0;
 
     // Rainbow colors (ROYGBV)
-    let colors = [
+    const colors = [
         [1.0, 0.2, 0.1, intensity],       // red
         [1.0, 0.6, 0.1, intensity * 0.9], // orange
         [1.0, 0.9, 0.1, intensity * 0.8], // yellow
@@ -842,13 +972,13 @@ Renderer.prototype._drawRainbow = function (cr, w, h, scene) {
         [0.5, 0.2, 0.8, intensity * 0.5]  // violet
     ];
 
-    let radii = [r1, r2, r3, r4, r5];
-    let arcStart = Math.PI * 0.1;
-    let arcEnd = Math.PI * 0.9;
+    const radii = [r1, r2, r3, r4, r5];
+    const arcStart = Math.PI * 0.1;
+    const arcEnd = Math.PI * 0.9;
 
     for (let i = 0; i < colors.length && i < radii.length; i++) {
-        let r = radii[i];
-        let c = colors[i];
+        const r = radii[i];
+        const c = colors[i];
         cr.setSourceRGBA(c[0], c[1], c[2], c[3]);
         cr.setLineWidth(Math.min(w, h) * 0.025);
         cr.newPath();
@@ -857,39 +987,55 @@ Renderer.prototype._drawRainbow = function (cr, w, h, scene) {
     }
 };
 
-/* ── Convenience: draw centred Pango text at x baseline ────────────────── */
+/**
+ * Draw centred Pango text at a given x baseline.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {string} txt - Text to render
+ * @param {number} cx - Centre X position
+ * @param {number} y - Y baseline position
+ * @param {number} sz - Font size
+ * @param {boolean} bold - Whether to use bold weight
+ * @returns {void}
+ */
 Renderer.prototype._cpango = function (cr, txt, cx, y, sz, bold) {
     this._drawPango(cr, txt, cx - this._pangoWidth(cr, txt, sz, bold) / 2, y, sz, bold);
 };
 
 /* ── Current weather display ─────────────────────────────────────────────── */
+
+/**
+ * Draw the current weather display (temperature, description, details).
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @returns {void}
+ */
 Renderer.prototype._drawWeather = function (cr, w) {
-    let d = this._d;
-    let tc = this._themeColors();
-    let wd = d._weather, m = wd.weather[0];
-    let temp = Math.round(wd.main.temp), feels = Math.round(wd.main.feels_like);
-    let hum = Math.round(wd.main.humidity), wind = Math.round(wd.wind.speed);
-    let unit = d.units === 'metric' ? '\u00B0C' : '\u00B0F';
-    let cx = w / 2, topY = 45;
+    const d = this._d;
+    const tc = this._themeColors();
+    const wd = d._weather, m = wd.weather[0];
+    const temp = Math.round(wd.main.temp), feels = Math.round(wd.main.feels_like);
+    const hum = Math.round(wd.main.humidity), wind = Math.round(wd.wind.speed);
+    const unit = d.units === 'metric' ? '\u00B0C' : '\u00B0F';
+    const cx = w / 2, topY = 45;
 
     cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 1);
     this._cpango(cr, temp + unit, cx, topY + 30, 54, true);
 
     cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.9);
-    let desc = m.description.charAt(0).toUpperCase() + m.description.slice(1);
+    const desc = m.description.charAt(0).toUpperCase() + m.description.slice(1);
     this._cpango(cr, desc, cx, topY + 58, 16, false);
 
     cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.7);
     this._cpango(cr, this._('feels_like') + ' ' + feels + unit, cx, topY + 78, 13, false);
 
-    let detailItems = [];
+    const detailItems = [];
     if (d.showHumidity !== false) detailItems.push({ val: hum + '%', lbl: this._('humidity') });
     if (d.showWind !== false) detailItems.push({ val: wind + ' ' + this._('wind_unit'), lbl: this._('wind') });
     if (d.showPressure !== false) detailItems.push({ val: wd.main.pressure + ' ' + this._('pressure_unit'), lbl: this._('pressure') });
     if (detailItems.length > 0) {
-        let detailY = topY + 105, detailW = Math.min(w - 80, 300), sX = cx - detailW / 2, cW = detailW / detailItems.length;
+        const detailY = topY + 105, detailW = Math.min(w - 80, 300), sX = cx - detailW / 2, cW = detailW / detailItems.length;
         for (let i = 0; i < detailItems.length; i++) {
-            let ix = sX + cW * i + cW / 2;
+            const ix = sX + cW * i + cW / 2;
             cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 0.95);
             this._cpango(cr, detailItems[i].val, ix, detailY + 19, 18, true);
             cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.6);
@@ -901,12 +1047,19 @@ Renderer.prototype._drawWeather = function (cr, w) {
 };
 
 /* ── Forecast display ────────────────────────────────────────────────────── */
+
+/**
+ * Draw the hourly forecast display.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @returns {void}
+ */
 Renderer.prototype._drawForecast = function (cr, w) {
-    let d = this._d;
+    const d = this._d;
     if (!d._forecast || !d._forecast.list) return;
-    let tc = this._themeColors();
-    let fY = Math.min(300, d._height * 0.65), pad = 30, fw = w - pad * 2;
-    let maxSlots = Math.min(d.forecastHours / 3 || 6, 8), step = fw / maxSlots;
+    const tc = this._themeColors();
+    const fY = Math.min(300, d._height * 0.65), pad = 30, fw = w - pad * 2;
+    const maxSlots = Math.min(d.forecastHours / 3 || 6, 8), step = fw / maxSlots;
 
     cr.save();
     cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.15);
@@ -917,11 +1070,11 @@ Renderer.prototype._drawForecast = function (cr, w) {
     cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.5);
     this._drawPango(cr, this._('forecast'), pad + 5, fY - 10, 10, false);
 
-    let list = d._forecast.list.slice(0, maxSlots);
+    const list = d._forecast.list.slice(0, maxSlots);
     for (let i = 0; i < list.length; i++) {
-        let fx = pad + step * i + step / 2, item = list[i];
-        let dt = new Date(item.dt * 1000);
-        let time = dt.getHours().toString().padStart(2, '0') + ':' + dt.getMinutes().toString().padStart(2, '0');
+        const fx = pad + step * i + step / 2, item = list[i];
+        const dt = new Date(item.dt * 1000);
+        const time = dt.getHours().toString().padStart(2, '0') + ':' + dt.getMinutes().toString().padStart(2, '0');
 
         cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.7);
         this._cpango(cr, time, fx, fY + 10, 10, false);
@@ -933,30 +1086,96 @@ Renderer.prototype._drawForecast = function (cr, w) {
     cr.restore();
 };
 
+/* ── Daily forecast display (3-5 days) ──────────────────────────────────── */
+
+/**
+ * Draw the daily forecast display.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @returns {void}
+ */
+Renderer.prototype._drawDailyForecast = function (cr, w) {
+    const d = this._d;
+    if (!d._dailyForecast || d._dailyForecast.length === 0) return;
+    const tc = this._themeColors();
+    const fY = Math.min(300, d._height * 0.65), pad = 30, fw = w - pad * 2;
+    const list = d._dailyForecast.slice(0, 5);
+    const step = fw / list.length;
+
+    cr.save();
+    cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.15);
+    cr.setLineWidth(1);
+    cr.moveTo(pad + 5, fY - 5);
+    cr.lineTo(w - pad - 5, fY - 5);
+    cr.stroke();
+    cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.5);
+    this._drawPango(cr, this._('forecast'), pad + 5, fY - 10, 10, false);
+
+    const unit = d.units === 'metric' ? '\u00B0' : '\u00B0F';
+    for (let i = 0; i < list.length; i++) {
+        const fx = pad + step * i + step / 2, item = list[i];
+
+        // Day name
+        cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.7);
+        this._cpango(cr, item.day, fx, fY + 10, 10, false);
+
+        // Weather emoji
+        cr.setSourceRGBA(1, 1, 1, 0.9);
+        this._cpango(cr, this._iconToEmoji(item.weather[0].icon, item.weather[0].id), fx, fY + 40, 20, false);
+
+        // High / low temperatures
+        const hi = Math.round(item.temp_max);
+        const lo = Math.round(item.temp_min);
+        cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 0.95);
+        this._cpango(cr, hi + unit, fx, fY + 62, 13, true);
+        cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.6);
+        this._cpango(cr, lo + unit, fx, fY + 77, 11, false);
+    }
+    cr.restore();
+};
+
 /* ── Loading state ───────────────────────────────────────────────────────── */
+
+/**
+ * Draw the loading state message.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @param {number} h - Desklet height
+ * @returns {void}
+ */
 Renderer.prototype._drawLoading = function (cr, w, h) {
-    let tc = this._themeColors();
+    const tc = this._themeColors();
     cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 0.7);
     this._cpango(cr, this._('loading'), w / 2, h / 2, 18, false);
 };
 
 /* ── Error state ─────────────────────────────────────────────────────────── */
+
+/**
+ * Draw the error state message.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} w - Desklet width
+ * @param {number} h - Desklet height
+ * @param {Object|string} errInfo - Error information
+ * @returns {void}
+ */
 Renderer.prototype._drawError = function (cr, w, h, errInfo) {
-    let tc = this._themeColors();
+    const tc = this._themeColors();
     cr.setSourceRGBA(tc.err[0], tc.err[1], tc.err[2], 0.8);
 
     let errMsg = '';
     if (typeof errInfo === 'string') errMsg = errInfo;
-    else if (errInfo && errInfo.key) errMsg = errInfo.detail !== undefined
-        ? this._(errInfo.key) + ': ' + errInfo.detail : this._(errInfo.key);
+    else if (errInfo && errInfo.key) {
+        errMsg = errInfo.detail !== undefined
+            ? this._(errInfo.key) + ': ' + errInfo.detail : this._(errInfo.key);
+    }
 
-    let lines = errMsg.split('\n');
+    const lines = errMsg.split('\n');
     let ly = h / 2 - lines.length * 10;
     for (let li = 0; li < lines.length; li++) {
         let line = lines[li];
         if (this._pangoWidth(cr, line, 14, false) > w - 60) {
-            while (this._pangoWidth(cr, line + '...', 14, false) > w - 60 && line.length > 3)
-                line = line.slice(0, -1);
+            while (this._pangoWidth(cr, line + '...', 14, false) > w - 60 && line.length > 3) { line = line.slice(0, -1); }
             line += '...';
         }
         this._cpango(cr, line, w / 2, ly, 14, false);
@@ -965,22 +1184,40 @@ Renderer.prototype._drawError = function (cr, w, h, errInfo) {
 };
 
 /* ── Pango text rendering ────────────────────────────────────────────────── */
+
+/**
+ * Draw Pango text at a given position.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {string} text - Text to render
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} size - Font size
+ * @param {boolean} bold - Whether to use bold weight
+ * @returns {void}
+ */
 Renderer.prototype._drawPango = function (cr, text, x, y, size, bold) {
-    let layout = PangoCairo.create_layout(cr);
+    const layout = PangoCairo.create_layout(cr);
     layout.set_text(text, -1);
-    let fd = Pango.FontDescription.from_string('Ubuntu, Sans ' + size);
+    const fd = Pango.FontDescription.from_string('Ubuntu, Sans ' + size);
     if (bold) fd.set_weight(Pango.Weight.BOLD);
     layout.set_font_description(fd);
     cr.moveTo(x, y - layout.get_baseline() / Pango.SCALE);
     PangoCairo.show_layout(cr, layout);
 };
 
-/* ── Text width measurement ──────────────────────────────────────────────── */
+/**
+ * Measure the width of text with Pango.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {string} text - Text to measure
+ * @param {number} size - Font size
+ * @param {boolean} bold - Whether to use bold weight
+ * @returns {number} Pixel width of the text
+ */
 Renderer.prototype._pangoWidth = function (cr, text, size, bold) {
     try {
-        let layout = PangoCairo.create_layout(cr);
+        const layout = PangoCairo.create_layout(cr);
         layout.set_text(text, -1);
-        let fd = Pango.FontDescription.from_string('Ubuntu, Sans ' + size);
+        const fd = Pango.FontDescription.from_string('Ubuntu, Sans ' + size);
         if (bold) fd.set_weight(Pango.Weight.BOLD);
         layout.set_font_description(fd);
         return layout.get_pixel_size()[0];
@@ -989,7 +1226,16 @@ Renderer.prototype._pangoWidth = function (cr, text, size, bold) {
     }
 };
 
-/* ── Rounded rectangle path ──────────────────────────────────────────────── */
+/**
+ * Draw a rounded rectangle path.
+ * @param {Cairo.Context} cr - Cairo drawing context
+ * @param {number} x - Top-left X
+ * @param {number} y - Top-left Y
+ * @param {number} w - Width
+ * @param {number} h - Height
+ * @param {number} r - Corner radius
+ * @returns {void}
+ */
 Renderer.prototype._roundRect = function (cr, x, y, w, h, r) {
     r = Math.min(r, w / 2, h / 2);
     cr.moveTo(x + r, y);
@@ -1004,10 +1250,15 @@ Renderer.prototype._roundRect = function (cr, x, y, w, h, r) {
     cr.closePath();
 };
 
-/* ── Icon code → emoji ───────────────────────────────────────────────────── */
+/**
+ * Map icon code and weather ID to emoji.
+ * @param {string} icon - Icon code (e.g. '01d', '01n')
+ * @param {number} id - OWM weather ID
+ * @returns {string} Emoji string
+ */
 Renderer.prototype._iconToEmoji = function (icon, id) {
     if (!icon) return '\u2600\uFE0F';
-    let n = icon.endsWith('n');
+    const n = icon.endsWith('n');
     if (id >= 200 && id < 300) return '\u26C8\uFE0F';
     if (id >= 300 && id < 400) return '\uD83C\uDF26\uFE0F';
     if (id >= 500 && id < 511) return '\uD83C\uDF27\uFE0F';
@@ -1021,11 +1272,16 @@ Renderer.prototype._iconToEmoji = function (icon, id) {
     return '\uD83C\uDF24\uFE0F';
 };
 
-/* ── Localised string lookup ─────────────────────────────────────────────── */
+/**
+ * Look up a localised string by key.
+ * @param {string} key - Translation key
+ * @returns {string} Localised string
+ */
 Renderer.prototype._ = function (key) {
-    let lang = this._d.language || 'en';
-    let dict = Constants.STRINGS[lang] || Constants.STRINGS.en;
+    const lang = this._d.language || 'en';
+    const dict = Constants.STRINGS[lang] || Constants.STRINGS.en;
     return dict[key] !== undefined ? dict[key] : Constants.STRINGS.en[key] || key;
 };
 
+// eslint-disable-next-line no-var
 var Renderer = Renderer;

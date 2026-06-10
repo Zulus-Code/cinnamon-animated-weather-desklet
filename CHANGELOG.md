@@ -3,11 +3,14 @@
 ## [2.2.0] - 2026-06-10
 
 ### Added
+- **Daily forecast (3–5 days)** — new `forecast-type` setting (Daily / Hourly), shows day name + icon + hi/lo temps
 - **Hail particles** — icy ball effect for severe thunderstorms (WMO 96, 99)
-- **Lightning flashes** — random full-screen flashes during thunderstorms
+- **Lightning flashes** — random full-screen flashes with branches during thunderstorms
 - **Rainbow effect** — appears when sun is low (5–35°) with light rain/drizzle
 - **New themes**: Warm (golden/amber), Cool (blue/teal), Nature (green/earth)
-- Rainbow arc in the lower-left area when conditions are right
+- **ESLint** — flat config for GJS, all 7 JS files: 0 errors, 0 warnings
+- **JSDoc types** — full `@param`/`@returns`/`@constructor` annotations on all 86 functions/methods
+- **Test suite** — 119 tests for core logic (utils, constants, sceneBuilder, renderer, weatherService)
 
 ### Changed
 - **Sun/Moon repositioned** to top-right corner — no longer hidden behind weather data
@@ -16,6 +19,8 @@
 - UI layout compacted: weather data shifted up by ~60px after emoji removal
 - Forecast strip starts slightly higher (`h * 0.65` instead of `0.75`)
 - Thunderstorm (`precipitationType`) now also triggers for 'hail'
+- Weather API: `forecast_days=2` → `forecast_days=6`, added `daily` params
+- Dead code removed: `_drawProceduralScene`, unused GJS imports (`Utils`, `Constants`, `St`, `ByteArray`), `getImagePath`
 
 ### Fixed
 - Transparent mode no longer hides celestial bodies and cloud layers

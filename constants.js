@@ -1,9 +1,14 @@
-/* constants.js — Shared constants for weather-animated@zulus */
+/**
+ * @file constants.js — Shared constants for weather-animated@zulus
+ * @module constants
+ */
 
-var UUID = "weather-animated@zulus";
-var DESKLET_ROOT = imports.ui.deskletManager.deskletMeta[UUID].path;
+const UUID = 'weather-animated@zulus';
+// eslint-disable-next-line no-unused-vars
+const DESKLOT_ROOT = imports.ui.deskletManager.deskletMeta[UUID].path;
 
-var COLORS = {
+// eslint-disable-next-line no-unused-vars
+const COLORS = {
     sky: {
         clear_day: ['#4facfe', '#00f2fe'],
         clear_night: ['#0c1445', '#1a237e'],
@@ -23,7 +28,8 @@ var COLORS = {
     }
 };
 
-var STRINGS = {
+// eslint-disable-next-line no-unused-vars
+const STRINGS = {
     en: {
         feels_like:        'Feels like',
         humidity:          'Humidity',
@@ -40,7 +46,7 @@ var STRINGS = {
         no_soup:           'No Soup async method available',
         wind_unit:         'km/h',
         pressure_unit:     'hPa',
-        resolve_err:       'Could not determine location',
+        resolve_err:       'Could not determine location'
     },
     ru: {
         feels_like:        '\u041E\u0449\u0443\u0449\u0430\u0435\u0442\u0441\u044F \u043A\u0430\u043A',
@@ -58,11 +64,12 @@ var STRINGS = {
         no_soup:           '\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0433\u043E \u043C\u0435\u0442\u043E\u0434\u0430 Soup async',
         wind_unit:         '\u043C/\u0441',
         pressure_unit:     '\u0433\u041F\u0430',
-        resolve_err:       '\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435',
+        resolve_err:       '\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435'
     }
 };
 
-var WMO_DESCRIPTIONS = {
+// eslint-disable-next-line no-unused-vars
+const WMO_DESCRIPTIONS = {
     en: {
         0: 'clear sky',
         1: 'mainly clear',

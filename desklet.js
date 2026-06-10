@@ -1,24 +1,20 @@
-/* weather-animated@zulus - desklet.js
+/**
+ * @file weather-animated@zulus - desklet.js
+ * @module desklet
+ *
  * Animated real-time weather desklet for Cinnamon (Linux Mint)
  * Uses Open-Meteo API (no API key required)
  *
  * Enhanced with procedural scene rendering via SceneBuilder.
  */
 
-const Desklet = imports.ui.desklet;
-const Settings = imports.ui.settings;
-const St = imports.gi.St;
 const Lang = imports.lang;
 const Mainloop = imports.mainloop;
+const Settings = imports.ui.settings;
+const UUID = 'weather-animated@zulus';
 
-const UUID = "weather-animated@zulus";
-const DESKLET_ROOT = imports.ui.deskletManager.deskletMeta[UUID].path;
-
-// Add desklet directory to GJS import search path so sibling modules can be loaded
-imports.searchPath.unshift(DESKLET_ROOT);
-
-const Constants = imports.constants;
-const Utils = imports.utils;
+imports.searchPath.unshift(imports.ui.deskletManager.deskletMeta[UUID].path);
+const Desklet = imports.ui.desklet;
 const WeatherServiceModule = imports.weatherService;
 const ParticleSystemModule = imports.particleSystem;
 const RendererModule = imports.renderer;
@@ -26,7 +22,16 @@ const SceneBuilderModule = imports.sceneBuilder;
 
 /* ── Main desklet class ──────────────────────────────────────────────────── */
 
+/**
+ * Main desklet class for the Animated Weather desklet.
+ * @extends {Desklet.Desklet}
+ */
 class AnimatedWeatherDesklet extends Desklet.Desklet {
+    /**
+     * @param {Object} metadata - Desklet metadata
+     * @param {number|string} desklet_id - Desklet ID
+     * @returns {void}
+     */
     constructor(metadata, desklet_id) {
         super(metadata, desklet_id);
         this._desklet_id = desklet_id;
@@ -34,6 +39,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
 
         this._weather = null;
         this._forecast = null;
+        this._dailyForecast = null;
         this._animating = false;
         this._animationId = 0;
         this._weatherTimerId = 0;
@@ -71,6 +77,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this.settings.bindProperty(Settings.BindingDirection.IN, 'show-humidity', 'showHumidity', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'show-wind', 'showWind', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'show-pressure', 'showPressure', this._onSettingsChanged.bind(this));
+        this.settings.bindProperty(Settings.BindingDirection.IN, 'forecast-type', 'forecastType', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'opacity', 'opacity', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'width', 'width', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'language', 'language', this._onSettingsChanged.bind(this));
@@ -83,6 +90,10 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
 
     /* ── UI building ────────────────────────────────────────────────────── */
 
+    /**
+     * Build the desklet UI with a St.DrawingArea.
+     * @returns {void}
+     */
     _buildUI() {
         this.setHeader('');
         this._drawArea = new St.DrawingArea({
@@ -96,17 +107,21 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this.setContent(this._drawArea);
     }
 
-    /* Recursively force all widgets to transparent */
+    /**
+     * Recursively force all widgets to transparent.
+     * @param {boolean} transparent - Whether to set transparent styles
+     * @returns {void}
+     */
     _setContainerTransparent(transparent) {
-        let style = transparent
+        const style = transparent
             ? 'background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important;'
             : null;
 
-        let apply = function (widget) {
+        const apply = function (widget) {
             if (!widget || typeof widget.set_style !== 'function') return;
             try { widget.set_style(style); } catch (e) {}
             if (typeof widget.get_children === 'function') {
-                let kids = widget.get_children();
+                const kids = widget.get_children();
                 for (let i = 0; i < kids.length; i++) apply(kids[i]);
             }
         };
@@ -119,8 +134,13 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
 
     /* ── Geometry change ────────────────────────────────────────────────── */
 
+    /**
+     * Handle desklet view geometry changes.
+     * @override
+     * @returns {void}
+     */
     on_desklet_view_geometry_changed() {
-        let [w, h] = this.actor.get_size();
+        const [w, h] = this.actor.get_size();
         if (w > 50 && h > 50) {
             this._width = w;
             this._height = h;
@@ -131,10 +151,14 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
 
     /* ── Settings handler ───────────────────────────────────────────────── */
 
+    /**
+     * Handle settings changes.
+     * @returns {void}
+     */
     _onSettingsChanged() {
         // Normalise combobox values
-        if (this.units === 'Celsius \u00B0C' || this.units === '\u00B0C') this.units = 'metric';
-        if (this.units === 'Fahrenheit \u00B0F' || this.units === '\u00B0F') this.units = 'imperial';
+        if (this.units === 'Celsius °C' || this.units === '°C') this.units = 'metric';
+        if (this.units === 'Fahrenheit °F' || this.units === '°F') this.units = 'imperial';
         if (this.theme === 'Auto (adapts to weather/sky)') this.theme = 'auto';
         if (this.theme === 'Glass (frosted, always light)') this.theme = 'glass';
         if (this.theme === 'Dark (night mode)') this.theme = 'dark';
@@ -142,7 +166,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         if (this.theme === 'Cool (blue/teal tones)') this.theme = 'cool';
         if (this.theme === 'Nature (green/earth tones)') this.theme = 'nature';
         if (this.language === 'English') this.language = 'en';
-        if (this.language === '\u0420\u0443\u0441\u0441\u043A\u0438\u0439') this.language = 'ru';
+        if (this.language === 'Русский') this.language = 'ru';
 
         if (this._width !== this.width) {
             this._width = Math.max(200, Math.min(600, this.width));
@@ -154,7 +178,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
             this._weatherTimerId = 0;
         }
 
-        let intervalMs = Math.max(2, Math.min(60, this.refreshInterval || 10)) * 60 * 1000;
+        const intervalMs = Math.max(2, Math.min(60, this.refreshInterval || 10)) * 60 * 1000;
         this._weatherTimerId = Mainloop.timeout_add(intervalMs, Lang.bind(this, function () {
             this._refreshWeather();
             return true;
@@ -163,7 +187,7 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this._setContainerTransparent(this.showBackground === false);
 
         // Refresh weather only when location or units actually changed (Fix #3)
-        let locationChanged = (this._lastLocation !== this.location) ||
+        const locationChanged = (this._lastLocation !== this.location) ||
                               (this._lastUnits !== this.units);
         this._lastLocation = this.location;
         this._lastUnits = this.units;
@@ -180,14 +204,22 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
 
     /* ── Particle initialisation ────────────────────────────────────────── */
 
+    /**
+     * Initialise particles based on current weather.
+     * @returns {void}
+     */
     _initParticles() {
-        let weatherId = this._weather ? this._weather.weather[0].id : 800;
-        let isNight = this._isNight();
+        const weatherId = this._weather ? this._weather.weather[0].id : 800;
+        const isNight = this._isNight();
         this._particleSystem.init(this._width, this._height, weatherId, isNight);
     }
 
     /* ── Weather fetch flow ─────────────────────────────────────────────── */
 
+    /**
+     * Refresh weather data from the API.
+     * @returns {void}
+     */
     _refreshWeather() {
         this._loading = true;
         this._error = null;
@@ -208,9 +240,15 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         );
     }
 
+    /**
+     * Handle successfully loaded weather data.
+     * @param {Object} data - Weather data object from fetchWeather
+     * @returns {void}
+     */
     _onWeatherLoaded(data) {
         this._weather = data.weather;
         this._forecast = data.forecast;
+        this._dailyForecast = data.dailyForecast;
         this._sunriseMinutes = data.sunriseMinutes;
         this._sunsetMinutes = data.sunsetMinutes;
         this._loading = false;
@@ -236,6 +274,11 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         if (this._drawArea) this._drawArea.queue_repaint();
     }
 
+    /**
+     * Handle weather fetch errors.
+     * @param {Object|string} err - Error information
+     * @returns {void}
+     */
     _onWeatherError(err) {
         this._error = err;
         this._loading = false;
@@ -243,20 +286,27 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
     }
 
     /* ── Night detection via sunrise/sunset ─────────────────────────────── */
-    /* (kept for backwards compatibility with theme colors) */
 
+    /**
+     * Determine whether it is currently night.
+     * @returns {boolean} True if it is night
+     */
     _isNight() {
         if (this._sunriseMinutes === null || this._sunsetMinutes === null) {
-            let h = new Date().getHours();
+            const h = new Date().getHours();
             return h < 6 || h >= 21;
         }
-        let now = new Date();
-        let curMin = now.getHours() * 60 + now.getMinutes();
+        const now = new Date();
+        const curMin = now.getHours() * 60 + now.getMinutes();
         return curMin < this._sunriseMinutes || curMin > this._sunsetMinutes;
     }
 
     /* ── Animation loop (≈30 fps) ───────────────────────────────────────── */
 
+    /**
+     * Start the animation loop.
+     * @returns {void}
+     */
     _startAnimation() {
         if (this._animating) return;
         this._animating = true;
@@ -264,11 +314,15 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this._animationLoop();
     }
 
+    /**
+     * Main animation loop (≈30 fps via Mainloop.timeout_add).
+     * @returns {void}
+     */
     _animationLoop() {
         if (!this._animating) return;
 
         try {
-            let now = Date.now();
+            const now = Date.now();
             let dt = (now - this._lastFrameTime) / 1000;
             this._lastFrameTime = now;
             if (dt > 0.1) dt = 0.1;
@@ -293,6 +347,10 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this._animationId = Mainloop.timeout_add(33, Lang.bind(this, this._animationLoop));
     }
 
+    /**
+     * Stop the animation loop.
+     * @returns {void}
+     */
     _stopAnimation() {
         this._animating = false;
         if (this._animationId) {
@@ -303,6 +361,11 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
 
     /* ── Cleanup ────────────────────────────────────────────────────────── */
 
+    /**
+     * Handle desklet removal (cleanup).
+     * @override
+     * @returns {void}
+     */
     on_desklet_removed() {
         this._stopAnimation();
         if (this._weatherTimerId) {
@@ -314,6 +377,13 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
 
 /* ── Entry point ─────────────────────────────────────────────────────────── */
 
+/**
+ * Desklet entry point.
+ * @param {Object} metadata - Desklet metadata
+ * @param {number|string} desklet_id - Desklet ID
+ * @returns {AnimatedWeatherDesklet} New desklet instance
+ */
+// eslint-disable-next-line no-unused-vars
 function main(metadata, desklet_id) {
     return new AnimatedWeatherDesklet(metadata, desklet_id);
 }

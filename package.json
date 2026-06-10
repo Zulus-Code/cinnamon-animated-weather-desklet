@@ -1,0 +1,23 @@
+{
+  "name": "cinnamon-animated-weather-desklet",
+  "version": "1.0.0",
+  "description": "A beautiful, real-time animated weather desklet for Linux Mint Cinnamon desktop. Features live particle effects (rain, snow, drifting clouds, twinkling stars), glassmorphism UI, auto-detection of your location, and **full Russian language support**.",
+  "main": "constants.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zulus-Code/cinnamon-animated-weather-desklet.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Zulus-Code/cinnamon-animated-weather-desklet/issues"
+  },
+  "homepage": "https://github.com/Zulus-Code/cinnamon-animated-weather-desklet#readme",
+  "devDependencies": {
+    "eslint": "^10.4.1"
+  }
+}
