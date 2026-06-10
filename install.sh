@@ -1,74 +1,108 @@
 #!/bin/bash
 # install.sh — Animated Weather Desklet installer for Cinnamon
-# Works both from cloned repo and via curl | bash
+# Works: local (git clone + ./install.sh), curl | bash, and make install
 set -e
 
 REPO="https://raw.githubusercontent.com/Zulus-Code/cinnamon-animated-weather-desklet/master"
 DEST="${HOME}/.local/share/cinnamon/desklets/weather-animated@zulus"
+VERSION="2.2.0"
 
-echo "☀️ Installing Animated Weather Desklet..."
+# ── Colors ──
+R='\033[0;31m'; G='\033[0;32m'; Y='\033[1;33m'; B='\033[0;34m'; N='\033[0m'
+
+info()  { echo -e " ${B}ℹ${N} $1"; }
+ok()    { echo -e " ${G}✓${N} $1"; }
+warn()  { echo -e " ${Y}⚠${N} $1"; }
+err()   { echo -e " ${R}✗${N} $1"; }
+
+# ── Flags ──
+MODE="install"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --uninstall|-u) MODE="uninstall"; shift ;;
+        --version|-v)   echo "Animated Weather Desklet v${VERSION}"; exit 0 ;;
+        --help|-h)
+            echo "Usage: ./install.sh [OPTION]"
+            echo ""
+            echo "  install      Copy desklet files (default)"
+            echo "  --uninstall  Remove desklet files"
+            echo "  --version    Show version"
+            echo "  --help       This message"
+            exit 0 ;;
+        *) err "Unknown option: $1"; exit 1 ;;
+    esac
+done
+
+# ── Uninstall ──
+if [[ "$MODE" == "uninstall" ]]; then
+    echo "🗑️  Removing Animated Weather Desklet..."
+    if [[ -d "$DEST" ]]; then
+        rm -rf "$DEST"
+        ok "Removed $DEST"
+    else
+        info "Not installed"
+    fi
+    exit 0
+fi
+
+# ── Install ──
+echo "☀️  Animated Weather Desklet v${VERSION}"
 echo ""
 
-echo "⚠️  NOTE: git clone is the recommended installation method:"
-echo ""
-echo "    git clone https://github.com/Zulus-Code/cinnamon-animated-weather-desklet.git \\"
-echo "      ~/.local/share/cinnamon/desklets/weather-animated@zulus/"
-echo ""
+# All required files
+FILES=(
+    desklet.js constants.js weatherService.js renderer.js
+    particleSystem.js sceneBuilder.js utils.js
+    metadata.json settings-schema.json stylesheet.css
+)
 
 # Create destination
 mkdir -p "$DEST"
 
-# All required files for the desklet
-FILES=(
-    desklet.js
-    constants.js
-    weatherService.js
-    renderer.js
-    particleSystem.js
-    sceneBuilder.js
-    utils.js
-    metadata.json
-    settings-schema.json
-    stylesheet.css
-)
-
-# Check if we're in a local repo (desklet.js exists next to install.sh)
-if [ -f "metadata.json" ]; then
-    echo "📁 Local install found, copying files..."
+# Local install (we're in the repo)
+if [[ -f "metadata.json" ]]; then
+    info "Local install — copying files..."
     for f in "${FILES[@]}"; do
-        if [ -f "$f" ]; then
-            cp -v "$f" "$DEST/"
+        if [[ -f "$f" ]]; then
+            cp "$f" "$DEST/" && ok "  $f"
         else
-            echo "⚠️  WARNING: $f not found, skipping"
+            warn "  $f not found, skipping"
         fi
     done
-    # Also copy translation files if available
-    if [ -d "po" ]; then
-        cp -r po "$DEST/"
+    if [[ -d "po" ]]; then
+        cp -r po "$DEST/" && ok "  translations (po/)"
     fi
+# Remote install (curl | bash)
 else
-    echo "📡 Downloading from GitHub..."
+    info "Downloading from GitHub..."
     for f in "${FILES[@]}"; do
-        echo "  Downloading $f..."
+        echo -n "  $f ... "
         curl -sL "${REPO}/${f}" -o "${DEST}/${f}"
-        if [ ! -s "${DEST}/${f}" ]; then
-            echo "❌ Failed to download $f"
+        if [[ ! -s "${DEST}/${f}" ]]; then
+            echo -e "${R}failed${N}"
+            err "Could not download $f"
             exit 1
         fi
+        echo -e "${G}done${N}"
     done
-    # Download translations
+    # Translations
     mkdir -p "${DEST}/po"
     for pf in ru.po weather-animated@zulus.pot; do
-        echo "  Downloading po/${pf}..."
-        curl -sL "${REPO}/po/${pf}" -o "${DEST}/po/${pf}"
+        echo -n "  po/${pf} ... "
+        curl -sL "${REPO}/po/${pf}" -o "${DEST}/po/${pf}" && echo -e "${G}done${N}" || warn "  po/${pf} unavailable"
     done
 fi
 
+# Version stamp
+printf '%s' "$VERSION" > "$DEST/.version"
+
 echo ""
-echo "✅ Installed to: $DEST"
+ok "Installed to $DEST"
 echo ""
-echo "⚠️  Restart Cinnamon: Ctrl+Alt+Esc"
-echo "   Then: Right-click desktop → Add Desklet → Анимированная погода (Animated Weather)"
+echo -e " ${Y}Next steps:${N}"
+echo "   1. Restart Cinnamon:  Ctrl+Alt+Esc"
+echo "   2. Right-click desktop → Add desklet → Animated Weather"
 echo ""
-echo "📖 No API key required — Open-Meteo is free and works out of the box."
+echo " 📖 Open-Meteo is free — no API key required."
 echo ""
