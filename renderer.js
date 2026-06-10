@@ -44,13 +44,41 @@ Renderer.prototype._themeColors = function () {
     let d = this._d;
     let t = d.theme || 'auto';
     let isDark = (t === 'dark') || (t === 'auto' && d._isNight());
-    return {
-        isDark: isDark,
-        text: isDark ? [0.878, 0.910, 1.000] : [1, 1, 1],
-        dim:  isDark ? [0.533, 0.600, 0.800] : [1, 1, 1],
-        faint:isDark ? [0.333, 0.400, 0.533] : [1, 1, 1],
-        err:  isDark ? [1.000, 0.588, 0.588] : [1, 0.8, 0.8]
-    };
+
+    switch (t) {
+        case 'warm':
+            return {
+                isDark: false,
+                text: [0.95, 0.85, 0.70],
+                dim:  [0.85, 0.70, 0.50],
+                faint:[0.70, 0.55, 0.35],
+                err:  [1.0, 0.5, 0.4]
+            };
+        case 'cool':
+            return {
+                isDark: false,
+                text: [0.75, 0.85, 1.0],
+                dim:  [0.55, 0.65, 0.85],
+                faint:[0.40, 0.50, 0.70],
+                err:  [1.0, 0.6, 0.6]
+            };
+        case 'nature':
+            return {
+                isDark: false,
+                text: [0.80, 0.90, 0.75],
+                dim:  [0.60, 0.75, 0.55],
+                faint:[0.45, 0.60, 0.40],
+                err:  [1.0, 0.6, 0.5]
+            };
+        default:
+            return {
+                isDark: isDark,
+                text: isDark ? [0.878, 0.910, 1.000] : [1, 1, 1],
+                dim:  isDark ? [0.533, 0.600, 0.800] : [1, 1, 1],
+                faint:isDark ? [0.333, 0.400, 0.533] : [1, 1, 1],
+                err:  isDark ? [1.000, 0.588, 0.588] : [1, 0.8, 0.8]
+            };
+    }
 };
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -79,17 +107,60 @@ Renderer.prototype.draw = function (area) {
         return;
     }
 
+    // ── Sky background (gradient) — only when background ON ──
     if (d.showBackground !== false) {
         try {
             let scene = d._scene || null;
-            this._drawProceduralScene(cr, w, h, scene);
-        } catch (e) { global.logError('Draw procedural scene error: ' + e); }
+            this._drawProceduralSky(cr, w, h, scene || null);
+        } catch (e) { global.logError('Draw procedural sky error: ' + e); }
+    }
+
+    // ── Sun / Moon — ALWAYS drawn (even on transparent background) ──
+    try {
+        let scene = d._scene || null;
+        if (scene) {
+            this._drawSunMoon(cr, w, h, scene);
+        } else {
+            this._drawSimpleFallback(cr, w, h);
+        }
+    } catch (e) { global.logError('Draw sun/moon error: ' + e); }
+
+    // ── Clouds — ALWAYS drawn ──
+    try {
+        let scene = d._scene || null;
+        if (scene) {
+            this._drawClouds(cr, w, h, scene);
+            // Fog overlay (part of sky scene)
+            if (scene.fogIntensity > 0.02) {
+                this._drawFog(cr, w, h, scene);
+            }
+        }
+    } catch (e) { global.logError('Draw clouds error: ' + e); }
+
+    // ── Rainbow — drawn when conditions are right ──
+    try {
+        let scene = d._scene || null;
+        if (scene && d.showBackground !== false) {
+            this._drawRainbow(cr, w, h, scene);
+        }
+    } catch (e) { global.logError('Draw rainbow error: ' + e); }
+
+    // ── Lightning flash — drawn on top of everything ──
+    try {
+        let scene = d._scene || null;
+        if (scene) {
+            this._drawLightning(cr, w, h, scene);
+        }
+    } catch (e) { global.logError('Draw lightning error: ' + e); }
+
+    // ── Glass panel — only when background ON ──
+    if (d.showBackground !== false) {
         try {
             this._drawGlassPanel(cr, w, h, d._scene || null);
         } catch (e) { global.logError('Draw glass panel error: ' + e); }
     }
 
-    // Particles (rain/snow) on top of glass
+    // Particles (rain/snow/hail) on top of glass
     try {
         if (d._particleSystem) d._particleSystem.draw(cr);
     } catch (e) { global.logError('Draw particles error: ' + e); }
@@ -111,28 +182,6 @@ Renderer.prototype.draw = function (area) {
 /* ══════════════════════════════════════════════════════════════════════════
  *  PROCEDURAL SCENE DRAWING
  * ══════════════════════════════════════════════════════════════════════════ */
-
-Renderer.prototype._drawProceduralScene = function (cr, w, h, scene) {
-    if (!scene) {
-        // Fallback to simple gradient if no scene data yet
-        this._drawSimpleFallback(cr, w, h);
-        return;
-    }
-
-    // 1. Procedural sky gradient
-    this._drawProceduralSky(cr, w, h, scene);
-
-    // 2. Sun (day) or Moon (night)
-    this._drawSunMoon(cr, w, h, scene);
-
-    // 3. Multi-layer clouds
-    this._drawClouds(cr, w, h, scene);
-
-    // 4. Fog overlay
-    if (scene.fogIntensity > 0.02) {
-        this._drawFog(cr, w, h, scene);
-    }
-};
 
 /* ── Fallback for when scene is not ready ───────────────────────────────── */
 Renderer.prototype._drawSimpleFallback = function (cr, w, h) {
@@ -198,17 +247,14 @@ Renderer.prototype._drawProceduralSky = function (cr, w, h, scene) {
 Renderer.prototype._drawSunMoon = function (cr, w, h, scene) {
     if (scene.sunElevation < -5 && !scene.isNight) return; // below horizon
 
-    // Calculate sun/moon position
-    let cx = w / 2;
-    let sunY, isSunVisible = false;
-
+    // Calculate sun/moon position — now in TOP-RIGHT corner
     if (scene.isNight || scene.sunElevation < -2) {
         // ── DRAW MOON ──
         let moonEl = scene.moonElevation || 40;
-        // Moon position: high at night, lower near horizon
-        let moonY = h * (0.05 + 0.45 * (1 - (moonEl + 10) / 80));
-        let moonX = w * 0.75 - (moonEl > 30 ? 0 : 30);
-        let moonR = Math.min(w, h) * 0.04;
+        // Moon in top-right: X near right edge, Y high
+        let moonX = w - Math.min(w * 0.12, 45);
+        let moonY = Math.min(h * 0.08, 30) + (1 - (moonEl + 10) / 80) * 20;
+        let moonR = Math.min(w, h) * 0.035;
 
         if (scene.moonVisible) {
             this._drawMoon(cr, moonX, moonY, moonR, scene);
@@ -216,17 +262,17 @@ Renderer.prototype._drawSunMoon = function (cr, w, h, scene) {
         return;
     }
 
-    // ── DRAW SUN ──
+    // ── DRAW SUN — top-right corner ──
     let sunEl = scene.sunElevation;
-    // Map elevation to Y position (top=high, bottom=horizon)
     if (sunEl <= 0) return;
-    let maxH = h * 0.15; // highest point (slightly above center)
-    let minH = h * 0.85; // horizon
-    sunY = minH - (sunEl / 90) * (minH - maxH);
-    let sunR = Math.min(w, h) * (0.04 + 0.02 * (1 - sunEl / 90)); // bigger near horizon
+    // Y position: smooth arc, anchored in top-right
+    let sunBaseY = Math.min(h * 0.08, 30);
+    let sunHorizonY = h * 0.55;
+    let sunY = sunBaseY + (sunHorizonY - sunBaseY) * (1 - sunEl / 90);
+    let sunR = Math.min(w, h) * (0.035 + 0.02 * (1 - sunEl / 90));
 
-    // X position: slightly offset from center
-    let sunX = cx + (0.5 - Math.sin(sunEl / 90 * Math.PI / 2)) * w * 0.1;
+    // X position: fixed near right edge, slight horizontal drift
+    let sunX = w - Math.min(w * 0.12, 45) + Math.sin(sunEl / 90 * Math.PI) * 8;
 
     // Sun glow (outer)
     let glowR = sunR * 5;
@@ -371,7 +417,7 @@ Renderer.prototype._drawCloudLayer = function (cr, w, h, scene, layer) {
     let col;
     if (isNight) {
         col = [0.15, 0.15, 0.20]; // dark clouds at night
-    } else if (scene.precipitationType === 'rain' || scene.precipitationType === 'thunder') {
+    } else if (scene.precipitationType === 'rain' || scene.precipitationType === 'thunder' || scene.precipitationType === 'hail') {
         col = [0.35, 0.38, 0.45]; // rainy grey
     } else if (scene.precipitationType === 'snow') {
         col = [0.55, 0.58, 0.65]; // snowy grey
@@ -712,8 +758,104 @@ Renderer.prototype._drawGlassPanel = function (cr, w, h, scene) {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════
- *  (Everything below is preserved from original renderer.js exactly)
+ *  LIGHTNING FLASH (thunderstorm effect)
  * ══════════════════════════════════════════════════════════════════════════ */
+
+Renderer.prototype._drawLightning = function (cr, w, h, scene) {
+    if (scene.precipitationType !== 'thunder' && scene.precipitationType !== 'hail') {
+        this._lightningTimer = 0;
+        this._lightningAlpha = 0;
+        return;
+    }
+
+    // Lightning timing
+    if (this._lightningTimer === undefined) this._lightningTimer = 0;
+    if (this._lightningAlpha === undefined) this._lightningAlpha = 0;
+
+    this._lightningTimer += 1 / 30; // ~one animation frame
+
+    // Random lightning strikes
+    if (this._lightningAlpha <= 0.01) {
+        // Wait random interval before next strike (3-15 seconds)
+        if (this._lightningTimer > 3 + Math.random() * 12) {
+            this._lightningAlpha = 0.6 + Math.random() * 0.4;
+            this._lightningTimer = 0;
+        }
+    } else {
+        // Flash decays quickly
+        this._lightningAlpha *= 0.85;
+        if (this._lightningAlpha < 0.01) {
+            this._lightningAlpha = 0;
+        }
+    }
+
+    if (this._lightningAlpha > 0.01) {
+        // Full-screen white flash with slight blue tint
+        let a = this._lightningAlpha;
+        cr.setSourceRGBA(1, 1, 1, a * 0.15);
+        cr.rectangle(0, 0, w, h);
+        cr.fill();
+
+        // Secondary flash (slightly stronger, shorter)
+        if (a > 0.3) {
+            cr.setSourceRGBA(0.9, 0.9, 1.0, a * 0.08);
+            cr.rectangle(0, 0, w, h);
+            cr.fill();
+        }
+    }
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  RAINBOW EFFECT (appears when sun is low + light rain)
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+Renderer.prototype._drawRainbow = function (cr, w, h, scene) {
+    // Rainbow conditions: sun low (5-35°), light rain or just after rain
+    let sunEl = scene.sunElevation;
+    let isRainy = (scene.precipitationType === 'rain' || scene.precipitationType === 'drizzle');
+    let lightPrecip = scene.precipitation < 0.6;
+    let sunnyEnough = sunEl > 5 && sunEl < 35;
+
+    if (!sunnyEnough || !isRainy || !lightPrecip) return;
+
+    // Rainbow opacity: strongest around 20° sun elevation
+    let intensity = 1 - Math.abs(sunEl - 20) / 15;
+    if (intensity < 0.1) return;
+    intensity = Math.min(1, intensity) * 0.35; // max 35% opacity
+
+    // Rainbow arc in the lower-left area of the desklet
+    let cx = w * 0.3;
+    let cy = h * 0.85;
+    let r1 = Math.min(w, h) * 0.35;
+    let r2 = r1 * 0.85; // inner radius
+    let r3 = r1 * 0.90;
+    let r4 = r1 * 0.95;
+    let r5 = r1 * 1.0;
+
+    // Rainbow colors (ROYGBV)
+    let colors = [
+        [1.0, 0.2, 0.1, intensity],       // red
+        [1.0, 0.6, 0.1, intensity * 0.9], // orange
+        [1.0, 0.9, 0.1, intensity * 0.8], // yellow
+        [0.3, 0.8, 0.3, intensity * 0.7], // green
+        [0.2, 0.4, 0.9, intensity * 0.6], // blue
+        [0.5, 0.2, 0.8, intensity * 0.5]  // violet
+    ];
+
+    let radii = [r1, r2, r3, r4, r5];
+    let arcStart = Math.PI * 0.1;
+    let arcEnd = Math.PI * 0.9;
+
+    for (let i = 0; i < colors.length && i < radii.length; i++) {
+        let r = radii[i];
+        let c = colors[i];
+        cr.setSourceRGBA(c[0], c[1], c[2], c[3]);
+        cr.setLineWidth(Math.min(w, h) * 0.025);
+        cr.newPath();
+        cr.arc(cx, cy, r, arcStart, arcEnd);
+        cr.stroke();
+    }
+};
 
 /* ── Convenience: draw centred Pango text at x baseline ────────────────── */
 Renderer.prototype._cpango = function (cr, txt, cx, y, sz, bold) {
@@ -730,26 +872,22 @@ Renderer.prototype._drawWeather = function (cr, w) {
     let unit = d.units === 'metric' ? '\u00B0C' : '\u00B0F';
     let cx = w / 2, topY = 45;
 
-    cr.setSourceRGBA(1, 1, 1, 1);
-    let emoji = this._iconToEmoji(m.icon, m.id);
-    this._cpango(cr, emoji, cx, topY + 20, 56, false);
-
     cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 1);
-    this._cpango(cr, temp + unit, cx, topY + 90, 54, true);
+    this._cpango(cr, temp + unit, cx, topY + 30, 54, true);
 
     cr.setSourceRGBA(tc.dim[0], tc.dim[1], tc.dim[2], 0.9);
     let desc = m.description.charAt(0).toUpperCase() + m.description.slice(1);
-    this._cpango(cr, desc, cx, topY + 118, 16, false);
+    this._cpango(cr, desc, cx, topY + 58, 16, false);
 
     cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.7);
-    this._cpango(cr, this._('feels_like') + ' ' + feels + unit, cx, topY + 140, 13, false);
+    this._cpango(cr, this._('feels_like') + ' ' + feels + unit, cx, topY + 78, 13, false);
 
     let detailItems = [];
     if (d.showHumidity !== false) detailItems.push({ val: hum + '%', lbl: this._('humidity') });
     if (d.showWind !== false) detailItems.push({ val: wind + ' ' + this._('wind_unit'), lbl: this._('wind') });
     if (d.showPressure !== false) detailItems.push({ val: wd.main.pressure + ' ' + this._('pressure_unit'), lbl: this._('pressure') });
     if (detailItems.length > 0) {
-        let detailY = topY + 175, detailW = Math.min(w - 80, 300), sX = cx - detailW / 2, cW = detailW / detailItems.length;
+        let detailY = topY + 105, detailW = Math.min(w - 80, 300), sX = cx - detailW / 2, cW = detailW / detailItems.length;
         for (let i = 0; i < detailItems.length; i++) {
             let ix = sX + cW * i + cW / 2;
             cr.setSourceRGBA(tc.text[0], tc.text[1], tc.text[2], 0.95);
@@ -759,7 +897,7 @@ Renderer.prototype._drawWeather = function (cr, w) {
         }
     }
     cr.setSourceRGBA(tc.faint[0], tc.faint[1], tc.faint[2], 0.6);
-    this._cpango(cr, wd.name + ', ' + (wd.sys.country || ''), cx, topY + 230, 13, false);
+    this._cpango(cr, wd.name + ', ' + (wd.sys.country || ''), cx, topY + 160, 13, false);
 };
 
 /* ── Forecast display ────────────────────────────────────────────────────── */
@@ -767,7 +905,7 @@ Renderer.prototype._drawForecast = function (cr, w) {
     let d = this._d;
     if (!d._forecast || !d._forecast.list) return;
     let tc = this._themeColors();
-    let fY = Math.min(300, d._height * 0.75), pad = 30, fw = w - pad * 2;
+    let fY = Math.min(300, d._height * 0.65), pad = 30, fw = w - pad * 2;
     let maxSlots = Math.min(d.forecastHours / 3 || 6, 8), step = fw / maxSlots;
 
     cr.save();

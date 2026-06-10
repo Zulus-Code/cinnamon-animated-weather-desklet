@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.2.0] - 2026-06-10
+
+### Added
+- **Hail particles** — icy ball effect for severe thunderstorms (WMO 96, 99)
+- **Lightning flashes** — random full-screen flashes during thunderstorms
+- **Rainbow effect** — appears when sun is low (5–35°) with light rain/drizzle
+- **New themes**: Warm (golden/amber), Cool (blue/teal), Nature (green/earth)
+- Rainbow arc in the lower-left area when conditions are right
+
+### Changed
+- **Sun/Moon repositioned** to top-right corner — no longer hidden behind weather data
+- **Removed large weather emoji** from the header area for a cleaner compact look
+- **Sun, moon, clouds, and lightning** now render even when transparent background is enabled (`showBackground: false`)
+- UI layout compacted: weather data shifted up by ~60px after emoji removal
+- Forecast strip starts slightly higher (`h * 0.65` instead of `0.75`)
+- Thunderstorm (`precipitationType`) now also triggers for 'hail'
+
+### Fixed
+- Transparent mode no longer hides celestial bodies and cloud layers
+
 ## [2.1.1] - 2026-06-07
 
 ### Fixed

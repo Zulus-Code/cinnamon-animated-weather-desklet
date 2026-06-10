@@ -350,7 +350,7 @@ SceneBuilder.prototype._updateSceneTarget = function (weatherData,
         cloudCover = 0.95;
         fogIntensity = 0;
         precip = 0.80;
-        precipType = 'thunder';
+        precipType = (wmoCode >= 96) ? 'hail' : 'thunder';
     } else {
         cloudCover = 0;
         fogIntensity = 0;
@@ -623,7 +623,7 @@ SceneBuilder.prototype._calcPanelTint = function (t) {
         // Sunset: warm orange
         t.panelTint = [1.0, 0.75, 0.55];
     } else if (t.precipitationType === 'rain' || t.precipitationType === 'thunder' ||
-               t.precipitationType === 'drizzle') {
+               t.precipitationType === 'drizzle' || t.precipitationType === 'hail') {
         // Rain: cool blue
         t.panelTint = [0.6, 0.7, 1.0];
     } else if (t.precipitationType === 'snow') {

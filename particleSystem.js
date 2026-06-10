@@ -100,6 +100,19 @@ Particle.prototype._init = function (type) {
             this.vy = -30 - Math.random() * 40;
             this.alpha = 1;
             break;
+
+        case 'hail':
+            // Hail: small hard balls, fast fall, some bounce
+            let hd = this.depth;
+            this.size = (2 + hd * 4) * (0.8 + Math.random() * 0.4);
+            this.speed = (300 + hd * 400 + Math.random() * 200);
+            this.vy = this.speed;
+            this.vx = -5 - Math.random() * 20;
+            this.alpha = 0.5 + hd * 0.4 + Math.random() * 0.1;
+            this._bouncePhase = Math.random() * Math.PI * 2;
+            this._rotationAngle = Math.random() * Math.PI * 2;
+            this._rotationSpeed = (Math.random() - 0.5) * 8;
+            break;
     }
 };
 
@@ -118,6 +131,11 @@ ParticleSystem.prototype.init = function (width, height, weatherId, isNight) {
         // Thunderstorm: heavy rain + varied particles
         for (let i = 0; i < 250; i++)
             this.particles.push(new Particle(Math.random() * width, Math.random() * height, 'rain'));
+        // Hail for severe thunderstorm (WMO 96, 99 → OWM 201, 202)
+        if (weatherId >= 201) {
+            for (let i = 0; i < 60; i++)
+                this.particles.push(new Particle(Math.random() * width, Math.random() * height, 'hail'));
+        }
     } else if (weatherId >= 300 && weatherId < 400) {
         // Drizzle: lighter rain
         for (let i = 0; i < 60; i++)
@@ -202,6 +220,10 @@ ParticleSystem.prototype.update = function (dt, width, height) {
                     p.vy = -30 - Math.random() * 40;
                 }
                 break;
+
+            case 'hail':
+                this._updateHail(p, dt, width, height);
+                break;
         }
     }
 };
@@ -270,7 +292,34 @@ ParticleSystem.prototype._updateSnow = function (p, dt, w, h) {
     if (p.x > w + 40) p.x = -40;
 };
 
-/* Draw all particles via Cairo context */
+/* ── Hail update with bouncing ─────────────────────────────────────────── */
+ParticleSystem.prototype._updateHail = function (p, dt, w, h) {
+    let speedFactor = 0.6 + p.depth * 0.8;
+    let actualVx = p.vx * speedFactor;
+    let actualVy = p.vy * speedFactor;
+
+    p.x += actualVx * dt;
+    p.y += actualVy * dt;
+
+    // Rotation while falling
+    p._rotationAngle += p._rotationSpeed * dt;
+    if (p._rotationAngle > Math.PI * 2) p._rotationAngle -= Math.PI * 2;
+
+    // Subtle horizontal wobble (hail is less affected by wind than rain)
+    let gust = Math.sin(this._time * 0.5 + p._bouncePhase) * 3;
+    p.x += gust * dt;
+
+    if (p.y >= h + 10) {
+        p.y = -10 - Math.random() * 20;
+        p.x = Math.random() * w;
+        p.depth = Math.random();
+        p._bouncePhase = Math.random() * Math.PI * 2;
+    }
+    if (p.x < -30) p.x = w + 30;
+    if (p.x > w + 30 && actualVx > 0) p.x = -30;
+};
+
+/* ── Draw all particles via Cairo context ──────────────────────────────── */
 ParticleSystem.prototype.draw = function (cr) {
     for (let i = 0; i < this.particles.length; i++) {
         let p = this.particles[i];
@@ -301,6 +350,10 @@ ParticleSystem.prototype.draw = function (cr) {
                 cr.setSourceRGBA(1, 1, 0.8, p.alpha * 0.8);
                 cr.arc(p.x, p.y, p.size * 0.5 * p.alpha, 0, Math.PI * 2);
                 cr.fill();
+                break;
+
+            case 'hail':
+                this._drawHail(cr, p);
                 break;
         }
 
@@ -411,6 +464,50 @@ ParticleSystem.prototype._drawStar = function (cr, p) {
     cr.moveTo(p.x, p.y - s * 3);
     cr.lineTo(p.x, p.y + s * 3);
     cr.stroke();
+};
+
+/* ── Draw hail stone ───────────────────────────────────────────────────── */
+ParticleSystem.prototype._drawHail = function (cr, p) {
+    let s = p.size * 0.5;
+    let angle = p._rotationAngle || 0;
+
+    // Hail is white/icy with a slight blue tint
+    cr.setSourceRGBA(0.85, 0.9, 1.0, p.alpha * 0.8);
+
+    // Small hail: simple circle
+    if (s < 2) {
+        cr.arc(p.x, p.y, s, 0, Math.PI * 2);
+        cr.fill();
+        return;
+    }
+
+    // Larger hail: icy ball with highlight
+    cr.save();
+    cr.translate(p.x, p.y);
+    cr.rotate(angle);
+
+    // Main icy ball
+    cr.setSourceRGBA(0.8, 0.85, 0.98, p.alpha * 0.85);
+    cr.arc(0, 0, s, 0, Math.PI * 2);
+    cr.fill();
+
+    // Highlight (light reflection)
+    cr.setSourceRGBA(1, 1, 1, p.alpha * 0.5);
+    cr.arc(-s * 0.25, -s * 0.25, s * 0.35, 0, Math.PI * 2);
+    cr.fill();
+
+    // Ice ring (subtle)
+    cr.setSourceRGBA(1, 1, 1, p.alpha * 0.2);
+    cr.setLineWidth(0.5);
+    cr.arc(0, 0, s * 0.7, 0, Math.PI * 2);
+    cr.stroke();
+
+    cr.restore();
+
+    // Faint glow
+    cr.setSourceRGBA(0.7, 0.8, 1.0, p.alpha * 0.08);
+    cr.arc(p.x, p.y, s * 2.5, 0, Math.PI * 2);
+    cr.fill();
 };
 
 var ParticleSystem = ParticleSystem;

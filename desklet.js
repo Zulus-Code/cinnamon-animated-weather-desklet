@@ -138,6 +138,9 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         if (this.theme === 'Auto (adapts to weather/sky)') this.theme = 'auto';
         if (this.theme === 'Glass (frosted, always light)') this.theme = 'glass';
         if (this.theme === 'Dark (night mode)') this.theme = 'dark';
+        if (this.theme === 'Warm (golden/amber tones)') this.theme = 'warm';
+        if (this.theme === 'Cool (blue/teal tones)') this.theme = 'cool';
+        if (this.theme === 'Nature (green/earth tones)') this.theme = 'nature';
         if (this.language === 'English') this.language = 'en';
         if (this.language === '\u0420\u0443\u0441\u0441\u043A\u0438\u0439') this.language = 'ru';
 

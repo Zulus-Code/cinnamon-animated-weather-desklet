@@ -39,7 +39,10 @@
         "options": {
             "auto": "Auto (adapts to weather/sky)",
             "glass": "Glass (frosted, always light)",
-            "dark": "Dark (night mode)"
+            "dark": "Dark (night mode)",
+            "warm": "Warm (golden/amber tones)",
+            "cool": "Cool (blue/teal tones)",
+            "nature": "Nature (green/earth tones)"
         }
     },
     "show-forecast": {
