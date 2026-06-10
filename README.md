@@ -1,24 +1,27 @@
 # ☀️ Animated Weather Desklet for Cinnamon
 
-A beautiful, real-time animated weather desklet for Linux Mint Cinnamon desktop. Features live particle effects (rain, snow, hail, drifting clouds, twinkling stars, lightning), glassmorphism UI, daily & hourly forecast, auto-detection of your location, and **full Russian language support**.
+A beautiful, real-time animated weather desklet for Linux Mint Cinnamon desktop. Features live particle effects (rain, snow, hail, drifting clouds, twinkling stars, lightning), glassmorphism UI, **rounded corners**, daily & hourly forecast, auto-detection of your location, and **full Russian language support**. Now with **dual weather API providers** — switch between MET Norway (yr.no) and Open-Meteo.
 
 ![Animated Weather Desklet](animated.gif)
 
 ## ✨ Features
 
 - **Live animated weather** — rain drops, snowflakes, **hail stones**, drifting clouds, twinkling stars, **lightning flashes**, **rainbow**
+- **Rounded corners** — 24px radius with Cairo clipping for a modern glass-morph look
+- **Dual weather providers** — MET Norway (yr.no) works in regions where Open-Meteo is blocked, switchable in settings
+- **Ambient light integration** — snow, rain, and hail particles pick up sky tones for natural scene blending
 - **Daily forecast (3–5 days)** — day name, weather icon, hi/lo temperatures
 - **Hourly forecast** — 6/12/24 hour forecast strip, 8 slots (switchable via settings)
 - **Transparent background mode** — toggle off the sky gradient and glass panel for a clean, floating look. Unlike other desklets, no visible container borders or backgrounds
 - **Glassmorphism UI** — frosted glass panel with adaptive transparency
 - **Sky gradient** — dynamic sky colours that adapt to weather condition and time of day
 - **Auto location** — detects your city via IP geolocation (or set manually)
-- **Real-time data** — powered by Open-Meteo (free, no API key required)
+- **Real-time data** — powered by MET Norway (yr.no) or Open-Meteo (free, no API key required)
 - **6 colour themes** — Auto, Glass, Dark, Warm, Cool, Nature
-- **Configurable** — units, theme, opacity, background toggle, width, refresh interval, forecast mode
+- **Configurable** — units, theme, opacity, background toggle, width, refresh interval, forecast mode, weather provider
 - **🌐 Russian language** — interface and settings available in Русский
 - **Lightweight** — ~30fps Cairo-rendered, no GPU needed
-- **No API key required** — Open-Meteo is free and works everywhere (including Russia, China, etc.)
+- **No API key required** — both MET Norway (yr.no) and Open-Meteo are free, no registration needed
 
 ## 📦 Installation
 
@@ -103,6 +106,7 @@ When switching to Russian:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | Location | `auto` | City name, `lat,lon` coordinates, or `auto` for IP geolocation |
+| Provider | MET Norway | Weather source: MET Norway (yr.no) or Open-Meteo |
 | Units | Celsius | °C or °F |
 | Language | English | Interface language (English / Русский) |
 | Refresh | 10 min | How often to fetch weather data |
@@ -169,7 +173,7 @@ weather-animated@zulus/
 |--------|-------|---------------|
 | `desklet.js` | ~315 | Desklet class, settings binding, lifecycle, animation loop, container transparency |
 | `constants.js` | ~128 | Sky/palette colors, WMO→description dict (en/ru), emoji mapping, i18n strings |
-| `weatherService.js` | ~280 | Open-Meteo API fetch, geocoding (Open-Meteo + ip-api.com), WMO→OWM ID mapping, daily/hourly forecast builder |
+| `weatherService.js` | ~590 | Open-Meteo + MET Norway API, geocoding (Open-Meteo + ip-api.com), WMO→OWM ID mapping, symbol→WMO mapping, daily/hourly forecast builder |
 | `renderer.js` | ~1030 | All drawing: sky gradient, glass panel, current weather UI, daily/hourly forecast, loading/error states |
 | `particleSystem.js` | ~520 | Particle classes, physics update, per-condition particle spawning (rain, snow, hail, clouds, stars) |
 | `sceneBuilder.js` | ~750 | Scene generation from weather codes, Perlin noise/fBm textures for clouds & fog, sky colour interpolation |
@@ -177,9 +181,9 @@ weather-animated@zulus/
 
 ### Code quality
 
-- **ESLint** — flat config for GJS, all 7 JS files **0 errors, 0 warnings**
-- **JSDoc** — full `@param`/`@returns` annotations on all 86 functions/methods across all modules
-- **Tests** — 119 unit tests for utils, constants, sceneBuilder, renderer, weatherService (run with `node tests/run.js`)
+- **ESLint** — flat config for GJS, all JS files **0 errors, 0 warnings**
+- **JSDoc** — full `@param`/`@returns` annotations on all functions/methods across all modules
+- **Tests** — 122 unit tests for utils, constants, sceneBuilder, renderer, weatherService (run with `node tests/run.js`)
 
 ### Architecture
 
@@ -189,7 +193,7 @@ weather-animated@zulus/
 - **Procedural scene** — Perlin noise / fBm textures for realistic clouds and fog layers
 - **HTTP** — libsoup2 (queue_message) / libsoup3 (send_and_read_async) / blocking curl fallback, encapsulated in `weatherService.js`
 - **i18n** — custom `STRINGS` dict + `_(key)` helper in `constants.js`; Gettext `.po` files for settings dialog
-- **Weather API** — [Open-Meteo](https://open-meteo.com/) (free, no API key). Uses WMO weather codes mapped to OWM-compatible IDs for rendering compatibility
+- **Weather API** — [MET Norway](https://www.yr.no/) (default) and [Open-Meteo](https://open-meteo.com/) (fallback). Both are free, no API key. Uses WMO weather codes mapped to OWM-compatible IDs for rendering compatibility. Provider switchable in desklet settings
 - **Geocoding** — [Open-Meteo Geocoding API](https://open-meteo.com/en/docs/geocoding-api) for city search, [ip-api.com](http://ip-api.com/) for auto-location
 - **No dependencies** — pure JavaScript, no Node.js, no WebKit
 
@@ -199,4 +203,4 @@ GNU General Public License v3.0 — see [LICENSE](LICENSE).
 
 ---
 
-*Made by [@Zulus-code](https://github.com/Zulus-code)* • Version **2.2.0** — see [CHANGELOG](CHANGELOG.md) for release history.
+*Made by [@Zulus-code](https://github.com/Zulus-code)* • Version **2.3.0** — see [CHANGELOG](CHANGELOG.md) for release history.

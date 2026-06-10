@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.3.0] - 2026-06-10
+
+### Added
+- **MET Norway (yr.no) weather provider** — dual provider support, switchable in desklet settings. Works in regions where Open-Meteo is blocked (Russia, China, etc.)
+- **Rounded corners** — 24px border-radius on desklet container with Cairo clipping for a modern glass-morph look
+- **Ambient light integration** — rain, snow, and hail particles dynamically pick up sky tones for natural scene-weather blending
+- **Symbol code → WMO mapping** — 40+ MET Norway symbol codes mapped to WMO weather codes
+- **Sunrise/sunset API** — separate fetch from MET Norway's sunrise/3.0/sun endpoint
+- **Wind chill approximation** — `feels_like` calculated from temperature + wind speed when >2 m/s
+- **User-Agent header** — set on Soup.Session (required by MET Norway)
+- **Hourly forecast from timeseries** — builder from MET Norway's flat timeseries array (up to 8 slots)
+- **Daily forecast aggregation** — groups timeseries by date, uses majority vote for daily symbol
+- **Renderer tests** — 3 new tests (total: 122) for fallback sky colors and _iconToEmoji
+
+### Changed
+- **README** — updated for MET Norway, dual providers, rounded corners, ambient light, config table
+- **Sun rendering** — multi-stop radial gradient for realistic solar disc effect
+- **Moon rendering** — softer glow falloff, smoother crescent shadows
+- **Particle colors** — rain, snow, and hail now multiply base color by `ambientLight` from scene
+- **Sky fallback** — inline RGB arrays replaced hex color lookups for faster static rendering
+- **Rounded container** — `_setContainerTransparent` and `_buildUI` now always apply border-radius: 24px
+- **Animation loop** — passes `scene.ambientLight` to particle system each frame
+- **ESLint config** — updated for new file structure (no longer hardcodes 7 files)
+
+### Fixed
+- **St not defined error** — added explicit `const St = imports.gi.St;` for Cinnamon >= 6.x
+
+---
+
 ## [2.2.0] - 2026-06-10
 
 ### Added
