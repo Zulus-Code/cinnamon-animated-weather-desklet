@@ -187,79 +187,15 @@ WeatherService.prototype.resolveLocation = function (location, language, onSucce
  * @param {string} country - Country code
  * @param {string} units - Unit system ('metric' or 'imperial')
  * @param {string} language - Language code ('en' or 'ru')
- * @param {Object|null} debugSettings - Debug mode settings (null = normal fetch)
- * @param {number} [debugSettings.weatherCode] - WMO weather code to mock
- * @param {number} [debugSettings.cloudCover] - Cloud cover percent [0-100]
- * @param {boolean} [debugSettings.isNight] - Force night mode
  * @param {Function} onSuccess - Callback on success, receives weather data object
  * @param {Function} onError - Callback on error, receives error object
  * @returns {void}
  */
-WeatherService.prototype.fetchWeather = function (lat, lon, name, country, units, language, debugSettings, onSuccess, onError) {
+WeatherService.prototype.fetchWeather = function (lat, lon, name, country, units, language, onSuccess, onError) {
     const self = this;
     const tempUnit = units === 'metric' ? 'celsius' : 'fahrenheit';
     const windUnit = units === 'metric' ? 'kmh' : 'mph';
     this._lang = language || 'en';
-
-    // ── Debug mode: use mock data instead of real API ──
-    if (debugSettings && debugSettings.weatherCode !== undefined) {
-        this._generateMockWeather(
-            lat, lon, name, country, units, language, debugSettings,
-            function (mockData) {
-                // Process mock data through the same code path
-                try {
-                    if (mockData.error) { onError({ key: 'api_err', detail: mockData.reason || 'unknown' }); return; }
-
-                    const current = mockData.current, hourly = mockData.hourly, daily = mockData.daily;
-
-                    let sunrise = null, sunset = null;
-                    if (daily && daily.sunrise && daily.sunrise.length > 0) {
-                        sunrise = Utils._getMinutes(daily.sunrise[0]);
-                        sunset = Utils._getMinutes(daily.sunset[0]);
-                    }
-
-                    const now = new Date();
-                    const curMin = now.getHours() * 60 + now.getMinutes();
-                    const isNight = (sunrise !== null && sunset !== null)
-                        ? (curMin < sunrise || curMin > sunset)
-                        : (now.getHours() < 6 || now.getHours() >= 21);
-
-                    const wmoCode = current.weather_code;
-                    const owmId = Utils.wmoToOwmId(wmoCode);
-                    const icon = _iconNum(owmId) + (isNight ? 'n' : 'd');
-
-                    const lang = language || 'en';
-                    const desc = (Constants.WMO_DESCRIPTIONS[lang] && Constants.WMO_DESCRIPTIONS[lang][wmoCode])
-                        || Constants.WMO_DESCRIPTIONS.en[wmoCode] || 'clear sky';
-
-                    const weatherData = {
-                        name: name || '',
-                        sys: { country: country || '' },
-                        main: {
-                            temp: current.temperature_2m,
-                            feels_like: current.apparent_temperature,
-                            humidity: current.relative_humidity_2m,
-                            pressure: Math.round(current.surface_pressure)
-                        },
-                        wind: { speed: current.wind_speed_10m },
-                        weather: [{ id: owmId, main: desc, description: desc, icon: icon }]
-                    };
-
-                    onSuccess({
-                        weather: weatherData,
-                        forecast: self._buildForecastFromHourly(hourly, daily),
-                        dailyForecast: self._buildDailyForecast(daily, self._lang),
-                        sunriseMinutes: sunrise,
-                        sunsetMinutes: sunset
-                    });
-                } catch (e) { onError({ key: 'parse_err', detail: e.toString().slice(0, 60) }); }
-            },
-            onError
-        );
-        return;
-    }
-
-    // ── Normal API fetch ──
 
     const url = 'https://api.open-meteo.com/v1/forecast'
         + '?latitude=' + lat + '&longitude=' + lon
@@ -398,131 +334,6 @@ WeatherService.prototype._buildDailyForecast = function (daily, lang) {
     }
 
     return list.length > 0 ? list : null;
-};
-
-/* ── Debug mode: generate mock Open-Meteo data ────────────────────────────── */
-
-/**
- * Generate synthetic weather data for testing/debug mode.
- * Mirrors the structure of the real Open-Meteo API response so all downstream
- * processing (WMO→OWM, forecast building, sunrise/sunset, night detection)
- * works identically.
- * @param {number} lat - Latitude
- * @param {number} lon - Longitude
- * @param {string} name - Location name
- * @param {string} country - Country code
- * @param {string} units - Unit system ('metric' or 'imperial')
- * @param {string} language - Language code
- * @param {Object} debug - Debug settings { weatherCode, cloudCover, isNight }
- * @param {Function} onSuccess - Callback with mock data
- * @param {Function} onError - Callback on error
- * @returns {void}
- */
-WeatherService.prototype._generateMockWeather = function (lat, lon, name, country, units, language, debug, onSuccess, onError) {
-    try {
-        const wmoCode = debug.weatherCode !== undefined ? debug.weatherCode : 0;
-        const cloudCover = debug.cloudCover !== undefined ? debug.cloudCover : 50;
-        const forceNight = debug.isNight === true;
-
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth();
-        const day = now.getDate();
-        const hour = now.getHours();
-        const min = now.getMinutes();
-
-        // Temperature anchors by weather type
-        let temp;
-        if (wmoCode >= 71 && wmoCode < 80) {
-            temp = -2;          // Snow
-        } else if (wmoCode >= 95) {
-            temp = 12;          // Thunderstorm
-        } else if (wmoCode >= 61) {
-            temp = 8;           // Rain
-        } else if (wmoCode >= 51) {
-            temp = 14;          // Drizzle
-        } else if (wmoCode >= 45) {
-            temp = 6;           // Fog
-        } else {
-            temp = 22;          // Clear
-        }
-
-        // Sunrise/sunset — control night vs day
-        let sunriseMin, sunsetMin;
-        if (forceNight) {
-            // Night: sunrise 2h ahead, sunset 1h ago → currently dark
-            sunriseMin = ((hour + 2) % 24) * 60 + min;
-            sunsetMin = ((hour - 1 + 24) % 24) * 60 + min;
-        } else {
-            // Day: sunrise 2h ago, sunset 2h ahead → currently light
-            sunriseMin = ((hour - 2 + 24) % 24) * 60 + min;
-            sunsetMin = ((hour + 2) % 24) * 60 + min;
-        }
-
-        function pad(n) { return n < 10 ? '0' + n : '' + n; }
-        function formatISO(y, m, d, h, mi) {
-            return y + '-' + pad(m + 1) + '-' + pad(d) + 'T' + pad(h) + ':' + pad(mi);
-        }
-
-        // Sunrise/sunset ISO strings
-        const sunriseHour = Math.floor(sunriseMin / 60);
-        const sunriseMinute = sunriseMin % 60;
-        const sunsetHour = Math.floor(sunsetMin / 60);
-        const sunsetMinute = sunsetMin % 60;
-        const sunriseISO = formatISO(year, month, day, sunriseHour, sunriseMinute);
-        const sunsetISO = formatISO(year, month, day, sunsetHour, sunsetMinute);
-
-        // ── Current weather ──
-        const current = {
-            temperature_2m: temp,
-            relative_humidity_2m: wmoCode >= 45 ? 85 : 50,
-            apparent_temperature: temp - 2,
-            weather_code: wmoCode,
-            cloud_cover: cloudCover,
-            wind_speed_10m: 10,
-            surface_pressure: 1013
-        };
-
-        // ── Hourly: generate from now over next 24h ──
-        const hourlyTime = [], hourlyTemp = [], hourlyCode = [];
-        for (let i = 0; i < 24; i++) {
-            const h = (hour + i) % 24;
-            hourlyTime.push(formatISO(year, month, day, h, 0));
-            hourlyTemp.push(temp + Math.sin(i / 24 * Math.PI * 2) * 3);
-            hourlyCode.push(wmoCode);
-        }
-
-        // ── Daily: 6 days ──
-        const dailyTime = [], dailyMax = [], dailyMin = [], dailyCode = [], dailySunrise = [], dailySunset = [];
-        for (let d = 0; d < 6; d++) {
-            const dt = new Date(year, month, day + d);
-            dailyTime.push(dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate()));
-            dailyMax.push(temp + 3);
-            dailyMin.push(temp - 4);
-            dailyCode.push(wmoCode);
-            dailySunrise.push(sunriseISO);
-            dailySunset.push(sunsetISO);
-        }
-
-        onSuccess({
-            current: current,
-            hourly: {
-                time: hourlyTime,
-                temperature_2m: hourlyTemp,
-                weather_code: hourlyCode
-            },
-            daily: {
-                time: dailyTime,
-                temperature_2m_max: dailyMax,
-                temperature_2m_min: dailyMin,
-                weather_code: dailyCode,
-                sunrise: dailySunrise,
-                sunset: dailySunset
-            }
-        });
-    } catch (e) {
-        onError({ key: 'mock_err', detail: e.toString().slice(0, 60) });
-    }
 };
 
 // eslint-disable-next-line no-var

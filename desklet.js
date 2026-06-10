@@ -81,10 +81,6 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
         this.settings.bindProperty(Settings.BindingDirection.IN, 'opacity', 'opacity', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'width', 'width', this._onSettingsChanged.bind(this));
         this.settings.bindProperty(Settings.BindingDirection.IN, 'language', 'language', this._onSettingsChanged.bind(this));
-        this.settings.bindProperty(Settings.BindingDirection.IN, 'debug-mode', 'debugMode', this._onSettingsChanged.bind(this));
-        this.settings.bindProperty(Settings.BindingDirection.IN, 'debug-weather-type', 'debugWeatherType', this._onSettingsChanged.bind(this));
-        this.settings.bindProperty(Settings.BindingDirection.IN, 'debug-cloud-cover', 'debugCloudCover', this._onSettingsChanged.bind(this));
-        this.settings.bindProperty(Settings.BindingDirection.IN, 'debug-night', 'debugNight', this._onSettingsChanged.bind(this));
 
         this._buildUI();
         this._onSettingsChanged();
@@ -233,17 +229,9 @@ class AnimatedWeatherDesklet extends Desklet.Desklet {
             this.location,
             this.language,
             Lang.bind(this, function (lat, lon, name, country) {
-                let debugSettings = null;
-                if (this.debugMode) {
-                    debugSettings = {
-                        weatherCode: parseInt(this.debugWeatherType, 10),
-                        cloudCover: this.debugCloudCover,
-                        isNight: this.debugNight
-                    };
-                }
                 this._weatherService.fetchWeather(
                     lat, lon, name, country,
-                    this.units, this.language, debugSettings,
+                    this.units, this.language,
                     Lang.bind(this, this._onWeatherLoaded),
                     Lang.bind(this, this._onWeatherError)
                 );
